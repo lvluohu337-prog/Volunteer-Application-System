@@ -1,0 +1,441 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+import io
+from pathlib import Path
+import zipfile
+import zlib
+from xml.sax.saxutils import escape
+
+
+PDF_PAGE_WIDTH = 595.28
+PDF_PAGE_HEIGHT = 841.89
+PDF_MARGIN_LEFT = 52.0
+PDF_MARGIN_RIGHT = 52.0
+PDF_MARGIN_TOP = 56.0
+PDF_MARGIN_BOTTOM = 56.0
+
+
+@dataclass(frozen=True)
+class ReportBlock:
+    style: str
+    text: str
+
+
+def export_report_docx(
+    report_data: dict[str, object],
+    output_path: Path,
+    *,
+    reviewed_by: str | None = None,
+    include_signature: bool = False,
+) -> None:
+    blocks = _build_report_blocks(report_data, reviewed_by=reviewed_by, include_signature=include_signature)
+    document_xml = _build_docx_document_xml(blocks)
+
+    with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", _build_docx_content_types_xml())
+        archive.writestr("_rels/.rels", _build_docx_root_rels_xml())
+        archive.writestr("docProps/core.xml", _build_docx_core_xml(report_data))
+        archive.writestr("docProps/app.xml", _build_docx_app_xml())
+        archive.writestr("word/document.xml", document_xml)
+        archive.writestr("word/styles.xml", _build_docx_styles_xml())
+        archive.writestr("word/_rels/document.xml.rels", _build_docx_document_rels_xml())
+
+
+def export_report_pdf(
+    report_data: dict[str, object],
+    output_path: Path,
+    *,
+    reviewed_by: str | None = None,
+    include_signature: bool = False,
+) -> None:
+    blocks = _build_report_blocks(report_data, reviewed_by=reviewed_by, include_signature=include_signature)
+    page_streams = _build_pdf_page_streams(blocks)
+    output_path.write_bytes(_build_pdf_bytes(page_streams))
+
+
+def _build_report_blocks(
+    report_data: dict[str, object],
+    *,
+    reviewed_by: str | None,
+    include_signature: bool,
+) -> list[ReportBlock]:
+    title = str(report_data.get("reportTitle") or "志愿规划报告")
+    subtitle = str(report_data.get("reportSubtitle") or "")
+    product_label = str(report_data.get("activeProductLabel") or "报告版本")
+    export_meta = f"导出版本：{product_label}    导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    if reviewed_by:
+        export_meta += f"    导出人：{reviewed_by}"
+
+    blocks = [
+        ReportBlock("title", title),
+        ReportBlock("meta", subtitle),
+        ReportBlock("meta", export_meta),
+    ]
+
+    for section in report_data.get("sections") or []:
+        if not isinstance(section, dict):
+            continue
+        heading = str(section.get("title") or "章节")
+        body = str(section.get("body") or "")
+        blocks.append(ReportBlock("heading", heading))
+        blocks.append(ReportBlock("body", body))
+
+    advisor_notes = report_data.get("advisorNotes") or []
+    if advisor_notes:
+        blocks.append(ReportBlock("heading", "咨询师补充备注"))
+        for item in advisor_notes:
+            if not isinstance(item, dict):
+                continue
+            note_title = str(item.get("note_title") or "未命名备注")
+            note_content = str(item.get("note_content") or "")
+            blocks.append(ReportBlock("bullet", f"{note_title}：{note_content}"))
+
+    blocks.append(ReportBlock("heading", "合规提示"))
+    blocks.append(ReportBlock("body", str(report_data.get("disclaimer") or "")))
+
+    if include_signature:
+        blocks.append(ReportBlock("heading", "签字确认"))
+        blocks.append(ReportBlock("signature", "咨询师签字：________________    家长确认：________________"))
+
+    return [block for block in blocks if block.text.strip()]
+
+
+def _build_docx_document_xml(blocks: list[ReportBlock]) -> str:
+    paragraphs: list[str] = []
+    for block in blocks:
+        style_id = _docx_style_id(block.style)
+        for line in _split_block_lines(block.text):
+            if not line:
+                paragraphs.append(_docx_paragraph_xml("", style_id="Normal"))
+                continue
+            paragraphs.append(_docx_paragraph_xml(line, style_id=style_id))
+
+    body = "".join(paragraphs)
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document '
+        'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"<w:body>{body}"
+        "<w:sectPr>"
+        '<w:pgSz w:w="11906" w:h="16838"/>'
+        '<w:pgMar w:top="1440" w:right="1080" w:bottom="1440" w:left="1080" w:header="720" w:footer="720" w:gutter="0"/>'
+        "</w:sectPr>"
+        "</w:body></w:document>"
+    )
+
+
+def _docx_paragraph_xml(text: str, *, style_id: str) -> str:
+    safe_text = escape(text)
+    return (
+        "<w:p>"
+        f'<w:pPr><w:pStyle w:val="{style_id}"/></w:pPr>'
+        "<w:r>"
+        '<w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="微软雅黑"/></w:rPr>'
+        f'<w:t xml:space="preserve">{safe_text}</w:t>'
+        "</w:r>"
+        "</w:p>"
+    )
+
+
+def _docx_style_id(style: str) -> str:
+    return {
+        "title": "Title",
+        "meta": "Subtitle",
+        "heading": "Heading1",
+        "bullet": "ListParagraph",
+        "signature": "Normal",
+    }.get(style, "Normal")
+
+
+def _build_docx_content_types_xml() -> str:
+    return """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>"""
+
+
+def _build_docx_root_rels_xml() -> str:
+    return """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>"""
+
+
+def _build_docx_document_rels_xml() -> str:
+    return """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"""
+
+
+def _build_docx_core_xml(report_data: dict[str, object]) -> str:
+    title = escape(str(report_data.get("reportTitle") or "志愿规划报告"))
+    created = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    return f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties
+    xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:dcterms="http://purl.org/dc/terms/"
+    xmlns:dcmitype="http://purl.org/dc/dcmitype/"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>{title}</dc:title>
+  <dc:creator>Gaokao Planning System</dc:creator>
+  <cp:lastModifiedBy>Gaokao Planning System</cp:lastModifiedBy>
+  <dcterms:created xsi:type="dcterms:W3CDTF">{created}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">{created}</dcterms:modified>
+</cp:coreProperties>"""
+
+
+def _build_docx_app_xml() -> str:
+    return """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
+    xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>Gaokao Planning System</Application>
+</Properties>"""
+
+
+def _build_docx_styles_xml() -> str:
+    return """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults>
+    <w:rPrDefault>
+      <w:rPr>
+        <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="微软雅黑"/>
+        <w:sz w:val="22"/>
+        <w:szCs w:val="22"/>
+      </w:rPr>
+    </w:rPrDefault>
+  </w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
+    <w:name w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr><w:spacing w:after="140" w:line="360" w:lineRule="auto"/></w:pPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Title">
+    <w:name w:val="Title"/>
+    <w:basedOn w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr><w:spacing w:after="220"/></w:pPr>
+    <w:rPr>
+      <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="微软雅黑"/>
+      <w:b/>
+      <w:sz w:val="34"/>
+      <w:color w:val="123A8F"/>
+    </w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Subtitle">
+    <w:name w:val="Subtitle"/>
+    <w:basedOn w:val="Normal"/>
+    <w:qFormat/>
+    <w:rPr>
+      <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="微软雅黑"/>
+      <w:sz w:val="20"/>
+      <w:color w:val="5B6475"/>
+    </w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="Heading1">
+    <w:name w:val="Heading 1"/>
+    <w:basedOn w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr><w:spacing w:before="180" w:after="120"/></w:pPr>
+    <w:rPr>
+      <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="微软雅黑"/>
+      <w:b/>
+      <w:sz w:val="28"/>
+      <w:color w:val="1D4ED8"/>
+    </w:rPr>
+  </w:style>
+  <w:style w:type="paragraph" w:styleId="ListParagraph">
+    <w:name w:val="List Paragraph"/>
+    <w:basedOn w:val="Normal"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:ind w:left="360" w:hanging="180"/>
+      <w:spacing w:after="120" w:line="360" w:lineRule="auto"/>
+    </w:pPr>
+  </w:style>
+</w:styles>"""
+
+
+def _build_pdf_page_streams(blocks: list[ReportBlock]) -> list[str]:
+    styles = {
+        "title": {"size": 20.0, "line_height": 30.0, "before": 0.0, "after": 8.0, "indent": 0.0, "color": "0.07 0.23 0.56 rg"},
+        "meta": {"size": 10.5, "line_height": 16.0, "before": 0.0, "after": 3.0, "indent": 0.0, "color": "0.36 0.39 0.46 rg"},
+        "heading": {"size": 14.0, "line_height": 22.0, "before": 10.0, "after": 4.0, "indent": 0.0, "color": "0.11 0.31 0.85 rg"},
+        "body": {"size": 11.0, "line_height": 18.5, "before": 0.0, "after": 6.0, "indent": 0.0, "color": "0 0 0 rg"},
+        "bullet": {"size": 11.0, "line_height": 18.5, "before": 0.0, "after": 4.0, "indent": 12.0, "color": "0 0 0 rg"},
+        "signature": {"size": 11.0, "line_height": 18.5, "before": 0.0, "after": 4.0, "indent": 0.0, "color": "0 0 0 rg"},
+    }
+
+    usable_width = PDF_PAGE_WIDTH - PDF_MARGIN_LEFT - PDF_MARGIN_RIGHT
+    page_streams: list[str] = []
+    current_commands: list[str] = []
+    y = PDF_PAGE_HEIGHT - PDF_MARGIN_TOP
+
+    def flush_page() -> None:
+        nonlocal current_commands, y
+        page_streams.append("\n".join(current_commands))
+        current_commands = []
+        y = PDF_PAGE_HEIGHT - PDF_MARGIN_TOP
+
+    for block in blocks:
+        spec = styles.get(block.style, styles["body"])
+        y -= spec["before"]
+        max_units = max(12.0, (usable_width - spec["indent"]) / spec["size"])
+        lines = _wrap_text(block.text, max_units=max_units)
+        if not lines:
+            lines = [""]
+        for line in lines:
+            if not line:
+                y -= spec["line_height"] * 0.8
+                continue
+            if y - spec["line_height"] < PDF_MARGIN_BOTTOM:
+                flush_page()
+            current_commands.append(
+                _pdf_text_command(
+                    text=line,
+                    x=PDF_MARGIN_LEFT + spec["indent"],
+                    y=y,
+                    font_size=spec["size"],
+                    color_command=spec["color"],
+                )
+            )
+            y -= spec["line_height"]
+        y -= spec["after"]
+
+    if current_commands or not page_streams:
+        flush_page()
+    return page_streams
+
+
+def _build_pdf_bytes(page_streams: list[str]) -> bytes:
+    objects: dict[int, bytes] = {}
+    catalog_id = 1
+    pages_id = 2
+    type0_font_id = 3
+    cid_font_id = 4
+    font_descriptor_id = 5
+    next_id = 6
+    page_ids: list[int] = []
+
+    for stream in page_streams:
+        content_bytes = zlib.compress(stream.encode("ascii"))
+        content_id = next_id
+        next_id += 1
+        page_id = next_id
+        next_id += 1
+        objects[content_id] = (
+            f"<< /Length {len(content_bytes)} /Filter /FlateDecode >>\nstream\n".encode("ascii")
+            + content_bytes
+            + b"\nendstream"
+        )
+        objects[page_id] = (
+            f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {PDF_PAGE_WIDTH:.2f} {PDF_PAGE_HEIGHT:.2f}] "
+            f"/Resources << /ProcSet [/PDF /Text] /Font << /F1 {type0_font_id} 0 R >> >> /Contents {content_id} 0 R >>"
+        ).encode("ascii")
+        page_ids.append(page_id)
+
+    kids = " ".join(f"{page_id} 0 R" for page_id in page_ids)
+    objects[pages_id] = f"<< /Type /Pages /Count {len(page_ids)} /Kids [{kids}] >>".encode("ascii")
+    objects[catalog_id] = f"<< /Type /Catalog /Pages {pages_id} 0 R >>".encode("ascii")
+    objects[type0_font_id] = (
+        f"<< /Type /Font /Subtype /Type0 /BaseFont /STSong-Light /Encoding /UniGB-UCS2-H "
+        f"/DescendantFonts [{cid_font_id} 0 R] >>"
+    ).encode("ascii")
+    objects[cid_font_id] = (
+        f"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light /CIDSystemInfo "
+        f"<< /Registry (Adobe) /Ordering (GB1) /Supplement 4 >> /FontDescriptor {font_descriptor_id} 0 R /DW 1000 >>"
+    ).encode("ascii")
+    objects[font_descriptor_id] = (
+        b"<< /Type /FontDescriptor /FontName /STSong-Light /Flags 4 /ItalicAngle 0 "
+        b"/Ascent 880 /Descent -120 /CapHeight 700 /StemV 80 >>"
+    )
+
+    max_object_id = max(objects)
+    buffer = io.BytesIO()
+    buffer.write(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0] * (max_object_id + 1)
+
+    for object_id in range(1, max_object_id + 1):
+        offsets[object_id] = buffer.tell()
+        buffer.write(f"{object_id} 0 obj\n".encode("ascii"))
+        buffer.write(objects[object_id])
+        buffer.write(b"\nendobj\n")
+
+    xref_offset = buffer.tell()
+    buffer.write(f"xref\n0 {max_object_id + 1}\n".encode("ascii"))
+    buffer.write(b"0000000000 65535 f \n")
+    for object_id in range(1, max_object_id + 1):
+        buffer.write(f"{offsets[object_id]:010d} 00000 n \n".encode("ascii"))
+
+    buffer.write(
+        f"trailer\n<< /Size {max_object_id + 1} /Root {catalog_id} 0 R >>\nstartxref\n{xref_offset}\n%%EOF".encode(
+            "ascii"
+        )
+    )
+    return buffer.getvalue()
+
+
+def _pdf_text_command(text: str, *, x: float, y: float, font_size: float, color_command: str) -> str:
+    hex_text = text.encode("utf-16-be").hex().upper()
+    return (
+        "BT\n"
+        f"/F1 {font_size:.2f} Tf\n"
+        f"{color_command}\n"
+        f"1 0 0 1 {x:.2f} {y:.2f} Tm\n"
+        f"<{hex_text}> Tj\n"
+        "ET"
+    )
+
+
+def _split_block_lines(text: str) -> list[str]:
+    return [line.strip() for line in str(text).replace("\r\n", "\n").split("\n")]
+
+
+def _wrap_text(text: str, *, max_units: float) -> list[str]:
+    wrapped: list[str] = []
+    for raw_line in str(text).replace("\r\n", "\n").split("\n"):
+        line = raw_line.strip()
+        if not line:
+            wrapped.append("")
+            continue
+
+        current = ""
+        current_units = 0.0
+        for char in line:
+            if not current and char.isspace():
+                continue
+            char_units = _char_display_units(char)
+            if current and current_units + char_units > max_units:
+                wrapped.append(current.rstrip())
+                if char.isspace():
+                    current = ""
+                    current_units = 0.0
+                else:
+                    current = char
+                    current_units = char_units
+                continue
+            current += char
+            current_units += char_units
+        if current:
+            wrapped.append(current.rstrip())
+    return wrapped
+
+
+def _char_display_units(char: str) -> float:
+    if char.isspace():
+        return 0.45
+    if ord(char) < 128:
+        if char in "MW@#%&":
+            return 0.95
+        if char in "il.,:;!'|":
+            return 0.35
+        return 0.58
+    return 1.0
