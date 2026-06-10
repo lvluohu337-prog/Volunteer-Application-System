@@ -96,16 +96,17 @@
 
 #### 真实招生数据链路
 
-- [ ] 核验当前 PostgreSQL 连接的真实数据状态，并形成书面台账
-- [ ] 补齐 `institutions`
-- [ ] 补齐 `majors`
-- [ ] 补齐 `admission_plans`
-- [ ] 补齐 `institution_admission_scores`
-- [ ] 补齐 `major_admission_scores`
-- [ ] 补齐 `subject_requirements`
-- [ ] 补齐 `province_batches`
-- [ ] 补齐 `admission_risk_rules`
-- [ ] 补齐 `policy_trends`
+- [x] 核验当前 PostgreSQL 连接的真实数据状态，并形成书面台账
+- [x] 补齐 `institutions`
+- [x] 补齐 `majors`
+- [x] 补齐 `admission_plans`
+- [x] 补齐 `institution_admission_scores`
+- [x] 补齐 `major_admission_scores`
+- [x] 补齐 `subject_requirements`
+- [x] 补齐 `province_batches`
+- [x] 补齐 `institution_rules`
+- [x] 补齐 `admission_risk_rules`
+- [x] 补齐 `policy_trends`
 - [ ] 验证 `backend/planning_repository.py` 的报告链路已能稳定命中真实候选，而不是 fallback 分支
 
 #### 结果可信度标识
@@ -314,6 +315,74 @@
 - `docs/志愿报告功能差距分析.md`
 - `docs/系统目标差距分析.md`
 
+执行清单（文件 / 命令）：
+
+1. 盘点前端页面和路由入口
+文件：
+- `src/router/index.js`
+- `src/App.vue`
+- `src/pages/*.vue`
+命令：
+```powershell
+rg --files src/pages
+Get-Content src/router/index.js -Encoding utf8
+Get-Content src/App.vue -Encoding utf8
+```
+验收：
+- 明确哪些页面属于主流程，哪些页面属于 demo / base-data / settings / 占位页。
+
+2. 盘点后端正式链路入口
+文件：
+- `backend/main.py`
+- `backend/planning_repository.py`
+- `backend/admissions_engine.py`
+- `backend/report_exporters.py`
+命令：
+```powershell
+rg -n "FastAPI|@app.get|@app.post|def get_student_|def export_report_package" backend
+rg -n "def match_admissions_candidates|def build_plan_columns_from_candidates|def export_report_pdf|def export_report_docx" backend
+```
+验收：
+- 明确分析、专业、志愿、报告、导出分别由哪些函数负责。
+
+3. 盘点数据库运行时状态
+文件：
+- `backend/database.py`
+- `.env`
+命令：
+```powershell
+Get-Content backend/database.py -Encoding utf8
+Get-Content .env -Encoding utf8
+```
+```powershell
+@'
+from backend.database import db_session
+tables = [
+    "students","scores","institutions","majors","province_batches",
+    "admission_plans","institution_admission_scores","major_admission_scores",
+    "subject_requirements","institution_rules","admission_risk_rules","policy_trends"
+]
+with db_session() as conn:
+    for table in tables:
+        total = conn.execute(f"SELECT COUNT(*) AS total FROM {table}").fetchone()["total"]
+        print(table, total)
+'@ | .\.venv\Scripts\python.exe -
+```
+验收：
+- 形成一份当前 PostgreSQL 实际数据台账，并与文档保持一致。
+
+4. 盘点导入脚本和历史文档
+文件：
+- `backend/scripts/*.py`
+- `docs/*.md`
+命令：
+```powershell
+rg --files backend/scripts
+rg --files docs
+```
+验收：
+- 明确哪些脚本负责数据导入，哪些文档可作为后续修订依据。
+
 ### 阶段 2：收敛主流程入口
 
 目标：
@@ -323,6 +392,52 @@
 当前状态：
 
 - 已完成
+
+执行清单（文件 / 命令）：
+
+1. 复核主导航是否只保留主流程
+文件：
+- `src/App.vue`
+- `src/data/mock.js`
+命令：
+```powershell
+Get-Content src/App.vue -Encoding utf8
+Get-Content src/data/mock.js -Encoding utf8
+```
+验收：
+- 主导航默认只暴露 `dashboard / students / intake / reports`。
+
+2. 复核工作台是否只引导主链路
+文件：
+- `src/pages/DashboardPage.vue`
+命令：
+```powershell
+Get-Content src/pages/DashboardPage.vue -Encoding utf8
+```
+验收：
+- 工作台只强调“新增学生 / 继续处理学生 / 生成正式报告”。
+
+3. 复核学生详情页是否承担流程工作台角色
+文件：
+- `src/pages/StudentDetailPage.vue`
+命令：
+```powershell
+Get-Content src/pages/StudentDetailPage.vue -Encoding utf8
+```
+验收：
+- 学生详情页能显示步骤状态、下一步动作、报告版本入口。
+
+4. 复核弱业务页面是否已降级
+文件：
+- `src/pages/DemoReportsPage.vue`
+- `src/pages/BaseDataPage.vue`
+- `src/pages/SettingsPage.vue`
+命令：
+```powershell
+rg -n "演示报告|基础数据|系统设置|占位页|待完善" src/pages
+```
+验收：
+- 弱业务页面不再占据主流程入口，且其定位说明清楚。
 
 ### 阶段 3：打通结构化推荐结果
 
@@ -338,6 +453,66 @@
 - 真实招生数据未落库完成前，正式推荐结果仍可能退回 fallback
 - 导出层结构化表格未完成
 
+执行清单（文件 / 命令）：
+
+1. 打通真实招生候选数据来源
+文件：
+- `backend/planning_repository.py`
+- `backend/admissions_engine.py`
+- `backend/admissions_repository.py`
+命令：
+```powershell
+rg -n "def _get_real_admissions_bundle|def match_admissions_candidates|def build_admissions_context" backend
+```
+验收：
+- 明确 `get_student_analysis / get_student_majors / get_student_plan / get_student_report` 何时走真实候选，何时走 fallback。
+
+2. 导入真实招生核心数据
+文件：
+- `backend/scripts/import_*.py`
+命令：
+```powershell
+rg --files backend/scripts
+```
+建议执行命令：
+```powershell
+.\.venv\Scripts\python.exe backend/scripts/import_foundation_data.py
+.\.venv\Scripts\python.exe backend/scripts/import_province_batches.py
+.\.venv\Scripts\python.exe backend/scripts/import_score_segments.py
+.\.venv\Scripts\python.exe backend/scripts/import_subject_requirements.py
+.\.venv\Scripts\python.exe backend/scripts/import_institution_rules.py
+.\.venv\Scripts\python.exe backend/scripts/import_admission_plans.py
+.\.venv\Scripts\python.exe backend/scripts/import_institution_admission_scores.py
+.\.venv\Scripts\python.exe backend/scripts/import_major_admission_scores.py
+```
+验收：
+- 核心招生表不再为空，且至少一省能产出真实候选。
+
+3. 增加“真实结果 / fallback 结果”标识
+文件：
+- `backend/planning_repository.py`
+- `src/pages/AnalysisPage.vue`
+- `src/pages/MajorsPage.vue`
+- `src/pages/PlanPage.vue`
+- `src/pages/ReportsPage.vue`
+命令：
+```powershell
+rg -n "hasStudent|ruleSummary|portraitRecommendation|recommendationTable|firstChoice" src/pages backend/planning_repository.py
+```
+验收：
+- 页面能明确显示当前结果来源和风险级别。
+
+4. 回归验证结构化推荐输出
+文件：
+- `backend/tests/test_admissions_engine.py`
+- `backend/tests/test_planning_repository_structured_report.py`
+命令：
+```powershell
+.\.venv\Scripts\python.exe -m unittest backend.tests.test_admissions_engine backend.tests.test_planning_repository_structured_report
+```
+验收：
+- `recommendationTable`、`firstChoice`、`alternatives`、`notRecommended` 结构稳定。
+
 ### 阶段 4：完成正式导出
 
 目标：
@@ -349,6 +524,57 @@
 - 真导出已完成
 - 正式表格化交付未完成
 - 正式下载链路未完成
+
+执行清单（文件 / 命令）：
+
+1. 把结构化推荐表写入 PDF / DOCX
+文件：
+- `backend/report_exporters.py`
+- `backend/planning_repository.py`
+命令：
+```powershell
+rg -n "recommendationTable|firstChoice|alternatives|notRecommended|sections|disclaimer" backend
+```
+验收：
+- 导出文件中包含冲 / 稳 / 保表格、第一志愿、备选志愿、不建议项。
+
+2. 增加正式下载接口
+文件：
+- `backend/main.py`
+- `backend/planning_repository.py`
+- `src/api/planning.js`
+- `src/pages/ReportsPage.vue`
+命令：
+```powershell
+rg -n "export/pdf|export/word|downloadUrl|artifact_path" backend src
+```
+验收：
+- 前端点击导出后能直接下载文件，而不是只显示本地路径。
+
+3. 拆分导出测试
+文件：
+- `backend/tests/test_report_export.py`
+- `backend/report_exporters.py`
+命令：
+```powershell
+Get-Content backend/tests/test_report_export.py -Encoding utf8
+.\.venv\Scripts\python.exe -m unittest backend.tests.test_report_export
+```
+验收：
+- 单测可独立覆盖 exporter，最小集成测试只保留一条。
+
+4. 进行本地联调验证
+文件：
+- `package.json`
+- `backend/scripts/start_backend.ps1`
+- `backend/scripts/start_frontend.ps1`
+命令：
+```powershell
+npm run dev
+npm run dev:backend
+```
+验收：
+- 在真实学生报告页中可生成、下载、留痕 PDF / Word。
 
 ### 阶段 5：补足数据与深度内容
 
@@ -363,6 +589,84 @@
 当前状态：
 
 - 未完成
+
+执行清单（文件 / 命令）：
+
+1. 明确正式支持省份清单
+文件：
+- `backend/admissions_repository.py`
+- `docs/*.md`
+- `TASKS_updated_with_staged_tasks.md`
+命令：
+```powershell
+@'
+from backend.database import db_session
+queries = {
+    "institution_admission_scores": "SELECT province, COUNT(*) AS total FROM institution_admission_scores GROUP BY province ORDER BY total DESC",
+    "major_admission_scores": "SELECT province, COUNT(*) AS total FROM major_admission_scores GROUP BY province ORDER BY total DESC",
+    "subject_requirements": "SELECT province, COUNT(*) AS total FROM subject_requirements GROUP BY province ORDER BY total DESC",
+    "province_batches": "SELECT province, COUNT(*) AS total FROM province_batches GROUP BY province ORDER BY total DESC"
+}
+with db_session() as conn:
+    for name, sql in queries.items():
+        print("---", name, "---")
+        for row in conn.execute(sql).fetchall():
+            print(row["province"], row["total"])
+'@ | .\.venv\Scripts\python.exe -
+```
+验收：
+- 文档里明确列出“已正式支持 / 部分支持 / 未支持”的省份清单。
+
+2. 补强风险、规则、政策覆盖
+文件：
+- `backend/admissions_repository.py`
+- `backend/scripts/import_institution_rules.py`
+- `backend/scripts/import_henan_policy_rules.py`
+命令：
+```powershell
+.\.venv\Scripts\python.exe backend/scripts/import_institution_rules.py
+.\.venv\Scripts\python.exe backend/scripts/import_henan_policy_rules.py
+```
+验收：
+- `institution_rules`、`admission_risk_rules`、`policy_trends` 有稳定可用数据。
+
+3. 建设专业 / 城市 / 画像解释库
+文件：
+- `backend/foundation_repository.py`
+- `data_assets/`
+- `src/pages/ReportsPage.vue`
+命令：
+```powershell
+rg -n "major_categories|city_industries|report_template_fields" backend data_assets src
+```
+验收：
+- 报告里能区分“数据依据”和“解释依据”，并支撑 399 档交付深度。
+
+4. 收口设置页和产品口径
+文件：
+- `src/pages/SettingsPage.vue`
+- `src/pages/DashboardPage.vue`
+- `src/pages/StudentDetailPage.vue`
+- `src/pages/ReportsPage.vue`
+- `backend/planning_repository.py`
+命令：
+```powershell
+rg -n "699|999|99|399|设置模块待完善|占位页" src backend
+```
+验收：
+- 设置页具备最小可用配置能力，产品版本文案全链路一致。
+
+5. 回归验证阶段成果
+文件：
+- `backend/tests/*.py`
+- `src/pages/*.vue`
+命令：
+```powershell
+.\.venv\Scripts\python.exe -m unittest backend.tests.test_admissions_engine backend.tests.test_planning_repository_structured_report backend.tests.test_report_export
+npm run build
+```
+验收：
+- 后端核心测试通过，前端可构建，主流程可从学生录入走到正式报告导出。
 
 ---
 

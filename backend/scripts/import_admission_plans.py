@@ -25,6 +25,7 @@ INVENTORY_PATH = (
     / "05_admission_plans_inventory.csv"
 )
 IMPORTED_DIR = PROJECT_ROOT / "data_assets" / "imported" / "henan_admission_plans"
+DATA_ASSETS_DIR = PROJECT_ROOT / "data_assets"
 
 
 def parse_args() -> argparse.Namespace:
@@ -153,6 +154,25 @@ def _choose_file_for_year(rows: list[dict[str, str]]) -> dict[str, str]:
     return sorted(rows, key=score)[0]
 
 
+def _resolve_inventory_path(raw_path: str) -> Path:
+    candidate = Path(raw_path)
+    if candidate.exists():
+        return candidate
+
+    normalized = raw_path.replace("/", "\\")
+    lowered = normalized.lower()
+    for marker in ("data_assets\\", "data-needed-standardized\\"):
+        index = lowered.find(marker)
+        if index == -1:
+            continue
+        relative = Path(normalized[index:])
+        rebased = PROJECT_ROOT / relative if marker == "data_assets\\" else DATA_ASSETS_DIR / relative
+        if rebased.exists():
+            return rebased
+
+    return candidate
+
+
 def _load_henan_plan_sources() -> tuple[list[dict[str, str]], dict[str, list[str]]]:
     grouped: dict[str, list[dict[str, str]]] = defaultdict(list)
     with INVENTORY_PATH.open("r", encoding="utf-8-sig", newline="") as file:
@@ -168,6 +188,8 @@ def _load_henan_plan_sources() -> tuple[list[dict[str, str]], dict[str, list[str
     skipped: dict[str, list[str]] = {}
     for year in sorted(grouped):
         chosen = _choose_file_for_year(grouped[year])
+        resolved_path = _resolve_inventory_path(chosen["file_path"])
+        chosen = {**chosen, "resolved_file_path": str(resolved_path)}
         selected.append(chosen)
         skipped[year] = [
             item["file_path"]
@@ -310,7 +332,7 @@ def load_henan_admission_plan_datasets(
     source_summary: list[dict[str, object]] = []
 
     for file_info in selected_files:
-        path = Path(file_info["file_path"])
+        path = Path(file_info.get("resolved_file_path") or file_info["file_path"])
         schema_name: str | None = None
         row_count = 0
         for _, row in iter_sheet_records(path, limit=limit_per_file):
