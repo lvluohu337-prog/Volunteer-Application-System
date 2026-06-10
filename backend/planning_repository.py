@@ -1456,6 +1456,12 @@ def _get_real_admissions_bundle(student: dict[str, Any]) -> dict[str, Any]:
     return match_admissions_candidates(student, evaluate_subject_requirement)
 
 
+def _real_context_notice(context: dict[str, Any]) -> str | None:
+    if context.get("candidate_strategy") == "score_relaxed_real_data":
+        return "当前候选仍来自真实招生表，但由于本届分数/位次口径与已入库历史年份不完全同口径，系统已临时放宽位次硬门槛，优先按真实分数线与真实招生记录筛选。"
+    return None
+
+
 def _build_real_major_cards(bundle: dict[str, Any]) -> list[dict[str, Any]]:
     return group_major_recommendations(bundle.get("candidates") or [])
 
@@ -1490,6 +1496,9 @@ def _build_real_rule_summary(
     risk_items = list(score_profile["risk_items"])
     if context.get("rank_source") == "score_segments_estimate":
         risk_items.append("当前位次来自一分一段表估算，正式填报前需换成官方位次。")
+    context_notice = _real_context_notice(context)
+    if context_notice:
+        risk_items.append(context_notice)
     if not candidates:
         risk_items.append("当前未命中真实招生候选，请检查分数、位次、选科或批次信息。")
     else:
@@ -1897,6 +1906,9 @@ def _build_real_report_sections(
     )
     if context.get("rank_source") == "score_segments_estimate":
         estimated_rank_note = "当前位次来自一分一段表估算，正式填报前必须换成官方位次。"
+    context_notice = _real_context_notice(context)
+    if context_notice:
+        estimated_rank_note = f"{estimated_rank_note}{context_notice}"
 
     return [
         {
@@ -2489,6 +2501,9 @@ def get_student_analysis(student_id: int) -> dict[str, Any]:
         ]
         if context.get("rank_source") == "score_segments_estimate":
             warnings.insert(0, "当前位次来自一分一段表估算，正式填报前请换成官方位次。")
+        context_notice = _real_context_notice(context)
+        if context_notice:
+            warnings.insert(0, context_notice)
         for item in admissions_bundle["candidates"][:4]:
             for risk in item.get("risks") or []:
                 risk_message = f"{item.get('institution_name') or '目标院校'}-{item.get('major_name') or '目标专业'}：{risk['label']}，{risk['note']}"

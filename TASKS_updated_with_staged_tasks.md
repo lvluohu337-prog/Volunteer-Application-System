@@ -166,7 +166,7 @@
 - [ ] 扩充 `institution_rules`
 - [ ] 扩充 `policy_trends`
 - [ ] 补齐 `province_batches` 后校验批次判断逻辑
-- [ ] 建立真实数据导入后的最小验收脚本
+- [x] 建立真实数据导入后的最小验收脚本
 
 #### 前端稳定性
 

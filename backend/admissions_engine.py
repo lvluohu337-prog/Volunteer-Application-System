@@ -1133,12 +1133,12 @@ def _fetch_candidate_rows(context: dict[str, Any], limit: int = 800) -> list[dic
     return [dict(row) for row in rows]
 
 
-def match_admissions_candidates(
+def _build_candidate_match_result(
     student: dict[str, Any],
+    context: dict[str, Any],
     evaluate_subject_requirement,
-    limit: int = 180,
+    limit: int,
 ) -> dict[str, Any]:
-    context = build_admissions_context(student)
     raw_rows = _fetch_candidate_rows(context)
     history_map = _fetch_history_map(raw_rows, context)
     explicit_rule_map = _fetch_explicit_rule_map(raw_rows, context)
@@ -1182,7 +1182,6 @@ def match_admissions_candidates(
         plan_risk = _summarize_plan_risk(history_rows)
         risks = _collect_risks(row, explicit_rules)
         has_high_risk = any(item["level"] == "high" for item in risks)
-        # 正式录取候选排序只看硬条件，不再叠加兴趣、地域或家长诉求偏好分。
         keyword_hits = []
         preference_score = 0
         plan_count = safe_int(row.get("latest_plan_count") or row.get("planned_count"))
@@ -1224,8 +1223,10 @@ def match_admissions_candidates(
         candidates.append(candidate)
 
     prepared = _prepare_recommendation_outputs(candidates, context)
+    result_context = dict(context)
+    result_context["raw_row_count"] = len(raw_rows)
     return {
-        "context": context,
+        "context": result_context,
         "candidates": prepared["candidates"][:limit],
         "bucketed_candidates": prepared["bucketed_candidates"],
         "recommendation_table": prepared["recommendation_table"],
@@ -1233,6 +1234,48 @@ def match_admissions_candidates(
         "alternatives": prepared["alternatives"],
         "not_recommended": _unique_rejections(rejected_candidates),
     }
+
+
+def _should_retry_with_score_relaxed_context(context: dict[str, Any]) -> bool:
+    if safe_number(context.get("score")) <= 0:
+        return False
+    if context.get("rank_source") == "score_segments_estimate":
+        return True
+
+    latest_year = safe_int(context.get("latest_year"))
+    exam_year = safe_int(context.get("exam_year"))
+    track_code = str(context.get("track_code") or "")
+    return bool(latest_year and exam_year and exam_year > latest_year and track_code in {"physics", "history"})
+
+
+def _score_relaxed_context(context: dict[str, Any]) -> dict[str, Any]:
+    relaxed = dict(context)
+    relaxed["rank"] = None
+    relaxed["rank_source"] = "score_relaxed_real_data"
+    relaxed["candidate_strategy"] = "score_relaxed_real_data"
+    return relaxed
+
+
+def match_admissions_candidates(
+    student: dict[str, Any],
+    evaluate_subject_requirement,
+    limit: int = 180,
+) -> dict[str, Any]:
+    context = build_admissions_context(student)
+    context["candidate_strategy"] = "rank_and_score"
+    result = _build_candidate_match_result(student, context, evaluate_subject_requirement, limit)
+    if result["candidates"] or not _should_retry_with_score_relaxed_context(context):
+        return result
+
+    relaxed_result = _build_candidate_match_result(
+        student,
+        _score_relaxed_context(context),
+        evaluate_subject_requirement,
+        limit,
+    )
+    if relaxed_result["candidates"]:
+        return relaxed_result
+    return result
 
 
 def group_major_recommendations(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
