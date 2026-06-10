@@ -5,52 +5,47 @@ export const API_RESPONSE_ENVELOPE = {
 };
 
 export const API_ENDPOINTS = {
-  navigation: {
-    method: "GET",
-    path: "/navigation",
-    summary: "获取导航配置"
-  },
   dashboard: {
     method: "GET",
     path: "/dashboard",
-    summary: "获取工作台数据"
+    summary: "Get dashboard data"
   },
   students: {
     list: {
       method: "GET",
       path: "/students",
-      summary: "获取学生列表"
+      summary: "List students"
     },
     detail: {
       method: "GET",
       path: "/students/:studentId",
-      summary: "获取学生详情"
+      summary: "Get student detail"
     },
     create: {
       method: "POST",
       path: "/students",
-      summary: "新增学生"
+      summary: "Create student"
     },
     update: {
       method: "PUT",
       path: "/students/:studentId",
-      summary: "更新学生"
+      summary: "Update student"
     },
     delete: {
       method: "DELETE",
       path: "/students/:studentId",
-      summary: "删除学生"
+      summary: "Delete student"
     },
     scores: {
       list: {
         method: "GET",
         path: "/students/:studentId/scores",
-        summary: "获取学生估分记录"
+        summary: "List student score records"
       },
       create: {
         method: "POST",
         path: "/students/:studentId/scores",
-        summary: "新增学生估分记录"
+        summary: "Create student score record"
       }
     }
   },
@@ -58,110 +53,91 @@ export const API_ENDPOINTS = {
     update: {
       method: "PUT",
       path: "/scores/:scoreId",
-      summary: "更新估分记录"
+      summary: "Update score record"
     },
     delete: {
       method: "DELETE",
       path: "/scores/:scoreId",
-      summary: "删除估分记录"
+      summary: "Delete score record"
     }
   },
   intake: {
     template: {
       method: "GET",
       path: "/intake/template",
-      summary: "获取录入模板"
+      summary: "Get intake template"
     },
     deriveProfile: {
       method: "GET",
       path: "/intake/derive-profile",
-      summary: "自动推算星座与前六字"
+      summary: "Derive profile from birthday"
     }
   },
   analysis: {
     detail: {
       method: "GET",
       path: "/analysis/student/:studentId",
-      summary: "获取分析结果"
+      summary: "Get analysis result"
     }
   },
   majors: {
     detail: {
       method: "GET",
       path: "/majors/student/:studentId",
-      summary: "获取专业推荐"
+      summary: "Get major recommendations"
     }
   },
   plans: {
     detail: {
       method: "GET",
       path: "/plans/student/:studentId",
-      summary: "获取志愿方案"
+      summary: "Get plan detail"
     }
   },
   reports: {
     detail: {
       method: "GET",
       path: "/reports/student/:studentId",
-      summary: "获取报告预览"
+      summary: "Get report preview"
     },
     advisorNotes: {
       create: {
         method: "POST",
         path: "/reports/student/:studentId/advisor-notes",
-        summary: "新增咨询师报告备注"
+        summary: "Create advisor note"
       }
     },
     exportPdf: {
       method: "POST",
       path: "/reports/student/:studentId/export/pdf",
-      summary: "导出 PDF 报告"
+      summary: "Export PDF report"
     },
     exportWord: {
       method: "POST",
       path: "/reports/student/:studentId/export/word",
-      summary: "导出 Word 报告"
+      summary: "Export Word report"
     }
   },
   foundation: {
     majors: {
       method: "GET",
       path: "/foundation/majors",
-      summary: "获取专业大类库"
+      summary: "List major categories"
     },
     cities: {
       method: "GET",
       path: "/foundation/cities",
-      summary: "获取城市产业库"
+      summary: "List city industries"
     },
     sampleStudents: {
       method: "GET",
       path: "/foundation/sample-students",
-      summary: "获取样例学生数据"
+      summary: "List sample students"
     },
     reportTemplateFields: {
       method: "GET",
       path: "/foundation/report-template-fields",
-      summary: "获取报告模板字段"
-    }
-  },
-  demoReports: {
-    report99: {
-      method: "GET",
-      path: "/demo-reports/99",
-      summary: "获取 99 元报告演示"
-    },
-    report399: {
-      method: "GET",
-      path: "/demo-reports/399",
-      summary: "获取 399 元报告演示"
-    }
-  },
-  settings: {
-    detail: {
-      method: "GET",
-      path: "/settings",
-      summary: "获取系统设置"
+      summary: "List report template fields"
     }
   }
 };

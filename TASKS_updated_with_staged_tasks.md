@@ -39,24 +39,27 @@
 
 ## 当前结论
 
-当前系统已经不再是纯演示原型，而是具备了以下基础：
+当前系统已经具备“学生录入 + 分析页面 + 报告页面 + 基础导出”的壳，但还不能视为“真实招生数据驱动的正式志愿交付系统”。
+
+这次按当前运行时 PostgreSQL 实际核查后的结论是：
 
 - 已有真实学生录入链路和主流程入口，主导航已收敛到 `dashboard / students / intake / reports`。
-- 已有真实招生数据入库，并能驱动真实候选匹配、结构化推荐和报告 JSON。
-- 已有结构化推荐结果：`recommendationTable`、`firstChoice`、`alternatives`、`notRecommended`。
-- 报告页面已经能展示结构化推荐结果，而不再只是段落说明。
+- 已有结构化推荐结果接口形态：`recommendationTable`、`firstChoice`、`alternatives`、`notRecommended`。
+- 报告页面已经能展示结构化推荐结果。
 - PDF / DOCX 真导出链路已经可用，并且会写入 `report_delivery_records` 留痕。
-- 数据库运行时已经切到 PostgreSQL-only，SQLite 仅剩仓库痕迹和忽略规则残留。
+- 数据库运行时已经切到 PostgreSQL-only。
+- 但当前连接的 PostgreSQL 中，`institutions`、`majors`、`admission_plans`、`institution_admission_scores`、`major_admission_scores`、`subject_requirements`、`admission_risk_rules`、`policy_trends`、`province_batches` 仍是空表，系统当前无法稳定命中真实招生候选。
 
-当前最需要正视的不是“功能完全没有”，而是“正式交付层、测试收口和文档口径还没有收口”。
+当前最需要正视的不是“页面还不够多”，而是“真实数据链路、正式导出链路、下载链路和产品口径都还没有收口”。
 
-当前最大的 5 个缺口：
+当前最大的 6 个缺口：
 
-1. `backend/report_exporters.py` 还没有把结构化推荐表正式导出到 PDF / DOCX，只是在导出段落内容。
-2. `backend/tests/test_report_export.py` 虽然已经有真实 PDF / DOCX 生成测试，但仍保留 `planning_repository.export_report_package(...)` 集成测试，隔离还不彻底。
-3. `province_batches` 已经不为空，但当前正式数据和真实可售能力仍明显偏河南，跨省正式化能力不足。
-4. 城市产业、具体专业、就业/考研路径的解释深度还不够支撑 399 以上正式交付。
-5. 699 / 999 档位所需的多方案、多策略、深度路径分析仍未产品化落地，且当前代码产品码只正式支持 `99 / 399 / 999`。
+1. 当前 PostgreSQL 真实招生表为空，系统会大量退回画像/规则兜底结果，而不是正式招生结果。
+2. 前端没有清楚区分“真实招生推荐”和“fallback 推荐”，容易让使用者误判结果可信度。
+3. `backend/report_exporters.py` 还没有把结构化推荐表正式导出到 PDF / DOCX，只是在导出段落内容。
+4. 当前导出返回的是服务器本地文件路径，不是真正的下载链路。
+5. 产品版本口径不一致，页面文案里仍出现 `699`，但当前代码正式产品配置只有 `99 / 399 / 999`。
+6. `src/pages/SettingsPage.vue` 仍然是占位页，缺少正式系统最小可用的配置能力。
 
 ---
 
@@ -88,17 +91,47 @@
 #### 数据底座
 
 - [x] PostgreSQL 已成为唯一运行时数据库入口
-- [x] `province_batches` 已导入河南批次数据
 
 ### P0
 
-#### 报告导出
+#### 真实招生数据链路
+
+- [ ] 核验当前 PostgreSQL 连接的真实数据状态，并形成书面台账
+- [ ] 补齐 `institutions`
+- [ ] 补齐 `majors`
+- [ ] 补齐 `admission_plans`
+- [ ] 补齐 `institution_admission_scores`
+- [ ] 补齐 `major_admission_scores`
+- [ ] 补齐 `subject_requirements`
+- [ ] 补齐 `province_batches`
+- [ ] 补齐 `admission_risk_rules`
+- [ ] 补齐 `policy_trends`
+- [ ] 验证 `backend/planning_repository.py` 的报告链路已能稳定命中真实候选，而不是 fallback 分支
+
+#### 结果可信度标识
+
+- [ ] 在后端响应中增加“真实招生结果 / fallback 结果”标记
+- [ ] `src/pages/AnalysisPage.vue` 明确展示当前结果来源
+- [ ] `src/pages/MajorsPage.vue` 明确展示当前结果来源
+- [ ] `src/pages/PlanPage.vue` 明确展示当前结果来源
+- [ ] `src/pages/ReportsPage.vue` 明确展示当前结果来源
+- [ ] 当未命中真实招生数据时，统一显示醒目的风险提示和后续操作建议
+
+#### 报告导出正式化
 
 - [ ] `backend/report_exporters.py` 接入结构化推荐表导出
 - [ ] PDF 中展示清晰的冲 / 稳 / 保推荐表
 - [ ] DOCX 中展示清晰的冲 / 稳 / 保推荐表
 - [ ] 导出中展示专业组/代码、最低分、最低位次、位次差、风险等级、推荐理由
 - [ ] 导出中补齐调剂风险、选科限制、计划变化风险、热门专业风险提示
+- [ ] 导出中补齐第一志愿、备选志愿、不建议报考项
+
+#### 下载链路
+
+- [ ] 增加正式下载接口，而不是只返回服务器本地文件路径
+- [ ] 前端点击“导出 PDF / Word”后可直接下载文件
+- [ ] 导出记录页优先展示可访问的下载入口，而不只是磁盘路径
+- [ ] 核验桌面联调和浏览器访问两种场景下的下载行为一致性
 
 #### 测试稳定性
 
@@ -108,13 +141,13 @@
 - [ ] 单个测试文件命令统一加超时约束，确保不会长时间卡住
 - [ ] 建立导出链路最小回归测试
 
-#### 数据层
+#### 产品口径
 
-- [ ] 明确当前“正式支持省份”清单
-- [ ] 核验浙江等目标省份是否已有与河南同等级别的真实招生数据
-- [ ] 扩充 `admission_risk_rules`
-- [ ] 扩充 `institution_rules`
-- [ ] 扩充 `policy_trends`
+- [ ] 统一当前正式产品版本口径为一套可执行定义
+- [ ] 修正工作台中的 `99 / 399 / 699 / 999` 文案
+- [ ] 修正学生详情页中的 `99 / 399 / 699 / 999` 文案
+- [ ] 修正报告页、文档、产品说明中的版本描述
+- [ ] 明确 `699` 是暂不支持还是立即补做
 
 #### 合规边界
 
@@ -123,6 +156,32 @@
 - [ ] 保持画像层只用于解释，不覆盖真实录取判断
 
 ### P1
+
+#### 数据层补强
+
+- [ ] 明确当前“正式支持省份”清单
+- [ ] 核验浙江等目标省份是否已有与河南同等级别的真实招生数据
+- [ ] 扩充 `admission_risk_rules`
+- [ ] 扩充 `institution_rules`
+- [ ] 扩充 `policy_trends`
+- [ ] 补齐 `province_batches` 后校验批次判断逻辑
+- [ ] 建立真实数据导入后的最小验收脚本
+
+#### 前端稳定性
+
+- [ ] 清理关键链路中的静默 mock 回退
+- [ ] 明确哪些接口允许 demo fallback，哪些接口必须真实报错
+- [ ] 在学生录入、画像推导、报告生成链路上优先关闭静默 fallback
+- [ ] 前端接口失败时显示可执行的错误提示，而不是继续展示假数据
+
+#### 设置页最小可用化
+
+- [ ] 为 `src/pages/SettingsPage.vue` 增加真实可用的配置项
+- [ ] 增加默认顾问署名配置
+- [ ] 增加合规文案配置
+- [ ] 增加报告导出基础配置
+- [ ] 增加产品版本开关或展示配置
+- [ ] 保持设置页只做“最小可用后台”，不扩成大而全系统
 
 #### 产品价值提升
 
@@ -166,11 +225,14 @@
 
 ### 当前执行顺序
 
-1. `backend/report_exporters.py` 结构化推荐表导出
-2. `backend/tests/test_report_export.py` 单测/集成拆分与超时约束
-3. 正式支持省份清单与目标省份数据核验
-4. 本地专业 / 城市 / 画像解释库
-5. 699 / 999 深度版能力
+1. 打通当前 PostgreSQL 的真实招生数据链路
+2. 区分“真实招生结果”和“fallback 结果”
+3. `backend/report_exporters.py` 结构化推荐表导出
+4. 正式下载链路
+5. `backend/tests/test_report_export.py` 单测/集成拆分与超时约束
+6. 统一产品版本口径
+7. 本地专业 / 城市 / 画像解释库
+8. 699 / 999 深度版能力
 
 ---
 
@@ -273,6 +335,7 @@
 
 - 页面展示已完成
 - 正式报告 JSON 已完成
+- 真实招生数据未落库完成前，正式推荐结果仍可能退回 fallback
 - 导出层结构化表格未完成
 
 ### 阶段 4：完成正式导出
@@ -285,11 +348,13 @@
 
 - 真导出已完成
 - 正式表格化交付未完成
+- 正式下载链路未完成
 
 ### 阶段 5：补足数据与深度内容
 
 目标：
 
+- 打通真实数据底座
 - 明确正式支持省份
 - 补规则覆盖
 - 补专业 / 城市 / 路径解释深度
@@ -306,37 +371,41 @@
 ### 当前系统快照
 
 - 真实学生链路已跑通。
-- 河南真实招生数据已经落库并可查询。
-- `province_batches` 已有数据，不再是空表。
+- 当前运行时 PostgreSQL 中仍只有极少量学生数据，真实招生核心表尚未落库完成。
 - 报告接口已能返回结构化推荐结果。
 - 报告页面已接入结构化推荐结果。
 - PDF / DOCX 真导出已可用，但正式导出仍是段落型。
+- 当前导出返回的仍是服务器本地文件路径，不是真正的下载链接。
 - 导出目录中已存在历史 `.html` / `.md` 与当前 `.pdf` / `.docx` 混存情况。
 
 ### 当前核心数据状态
 
 | 表名 | 当前状态 |
 | --- | --- |
-| `institutions` | 已导入，当前约 5738 条 |
-| `majors` | 已导入，当前约 99775 条 |
-| `province_batches` | 已导入，当前约 142 条，主要为河南 |
-| `score_segments` | 已导入，当前约 12111 条 |
-| `admission_plans` | 已导入，当前约 442882 条 |
-| `institution_admission_scores` | 已导入，当前约 35298 条 |
-| `major_admission_scores` | 已导入，当前约 304053 条 |
-| `subject_requirements` | 已导入，当前约 60449 条 |
-| `institution_rules` | 已导入，当前约 5529 条，仍需校验质量与覆盖口径 |
-| `admission_risk_rules` | 已导入，当前约 14 条，覆盖仍薄 |
-| `policy_trends` | 已导入，当前约 9 条，覆盖仍薄 |
+| `students` | 当前 PostgreSQL 实查为 1 条 |
+| `scores` | 当前 PostgreSQL 实查为 1 条 |
+| `institutions` | 当前 PostgreSQL 实查为 0 条 |
+| `majors` | 当前 PostgreSQL 实查为 0 条 |
+| `province_batches` | 当前 PostgreSQL 实查为 0 条 |
+| `admission_plans` | 当前 PostgreSQL 实查为 0 条 |
+| `institution_admission_scores` | 当前 PostgreSQL 实查为 0 条 |
+| `major_admission_scores` | 当前 PostgreSQL 实查为 0 条 |
+| `subject_requirements` | 当前 PostgreSQL 实查为 0 条 |
+| `institution_rules` | 当前未在本轮逐表核数，但需与正式导入状态一并复核 |
+| `admission_risk_rules` | 当前 PostgreSQL 实查为 0 条 |
+| `policy_trends` | 当前 PostgreSQL 实查为 0 条 |
 
 ### 当前真实风险
 
-1. 导出层还没有完成结构化交付，当前 PDF / DOCX 仍以段落为主。
-2. 导出测试仍未完全拆分，仍保留一条 `planning_repository.export_report_package(...)` 集成链路。
-3. 仓库里仍有 `backend/*.db` 级别的本地 SQLite 痕迹，和“统一 PostgreSQL”表述并不完全一致。
-4. `data_assets/generated_reports/` 当前没有在 `.gitignore` 中统一忽略，且历史产物格式混杂，需要明确管理策略。
-5. demo / base-data / settings 等页面仍在代码中存在，只是主导航弱化了入口。
-6. 产品文档常写 `99 / 399 / 699 / 999`，但当前代码正式产品配置只有 `99 / 399 / 999`，存在口径偏差。
+1. 当前 PostgreSQL 真实招生核心表为空，系统无法稳定给出真实招生推荐。
+2. 前端还没有清楚标识“真实结果 / fallback 结果”，容易误导使用者。
+3. 导出层还没有完成结构化交付，当前 PDF / DOCX 仍以段落为主。
+4. 导出测试仍未完全拆分，仍保留一条 `planning_repository.export_report_package(...)` 集成链路。
+5. 当前导出返回本地路径，不是真正可下载的文件链接。
+6. 仓库里仍有 `backend/*.db` 级别的本地 SQLite 痕迹，和“统一 PostgreSQL”表述并不完全一致。
+7. `data_assets/generated_reports/` 当前没有在 `.gitignore` 中统一忽略，且历史产物格式混杂，需要明确管理策略。
+8. demo / base-data / settings 等页面仍在代码中存在，只是主导航弱化了入口。
+9. 产品文档常写 `99 / 399 / 699 / 999`，但当前代码正式产品配置只有 `99 / 399 / 999`，存在口径偏差。
 
 ### 不在本轮处理范围内
 

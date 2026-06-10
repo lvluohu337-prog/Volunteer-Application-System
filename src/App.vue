@@ -2,7 +2,13 @@
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppShell from "./components/AppShell.vue";
-import { navigationItems } from "./data/mock.js";
+
+const navigationItems = [
+  { key: "dashboard", label: "工作台", short: "DB" },
+  { key: "students", label: "学生管理", short: "ST" },
+  { key: "intake", label: "学生录入", short: "FM" },
+  { key: "reports", label: "报告管理", short: "RP" }
+];
 
 const dialogVisible = ref(false);
 const dialogTitle = ref("操作确认");
@@ -17,12 +23,6 @@ const currentPage = computed(() => {
 
   return "dashboard";
 });
-
-const primaryNavigationKeys = new Set(["dashboard", "students", "intake", "reports"]);
-
-const primaryNavigationItems = computed(() =>
-  navigationItems.filter((item) => primaryNavigationKeys.has(item.key))
-);
 
 function navigate(page) {
   router.push({ name: page });
@@ -43,7 +43,7 @@ function openDialog(payload) {
 <template>
   <AppShell
     :current-page="currentPage"
-    :navigation-items="primaryNavigationItems"
+    :navigation-items="navigationItems"
     @navigate="navigate"
   >
     <RouterView v-slot="{ Component }">

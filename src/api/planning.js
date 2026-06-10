@@ -170,12 +170,6 @@ async function resolveStudentId(studentId) {
   return data.rows?.[0]?.id ?? null;
 }
 
-export async function fetchNavigation() {
-  return apiRequest(API_ENDPOINTS.navigation.path, {
-    method: API_ENDPOINTS.navigation.method
-  });
-}
-
 export async function fetchDashboardData(params = {}) {
   return apiRequest(API_ENDPOINTS.dashboard.path, {
     method: API_ENDPOINTS.dashboard.method,
@@ -349,12 +343,6 @@ export async function exportReportWord(studentId, params = {}) {
   });
 }
 
-export async function fetchSettingsData() {
-  return apiRequest(API_ENDPOINTS.settings.detail.path, {
-    method: API_ENDPOINTS.settings.detail.method
-  });
-}
-
 export async function fetchFoundationMajors(params = {}) {
   return apiRequest(API_ENDPOINTS.foundation.majors.path, {
     method: API_ENDPOINTS.foundation.majors.method,
@@ -383,20 +371,3 @@ export async function fetchFoundationReportTemplateFields(params = {}) {
   });
 }
 
-export async function fetchDemoReport99(sampleStudentId) {
-  return apiRequest(API_ENDPOINTS.demoReports.report99.path, {
-    method: API_ENDPOINTS.demoReports.report99.method,
-    query: {
-      sample_student_id: sampleStudentId
-    }
-  });
-}
-
-export async function fetchDemoReport399(sampleStudentId) {
-  return apiRequest(API_ENDPOINTS.demoReports.report399.path, {
-    method: API_ENDPOINTS.demoReports.report399.method,
-    query: {
-      sample_student_id: sampleStudentId
-    }
-  });
-}

@@ -5,10 +5,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.admissions_repository import get_admissions_schema_overview
 from backend.database import init_db
 from backend.foundation_repository import (
-    generate_demo_report,
     list_city_industries,
     list_major_categories,
     list_report_template_fields,
@@ -19,7 +17,6 @@ from backend.planning_repository import (
     create_report_advisor_note,
     export_report_package,
     get_dashboard_data,
-    get_settings_data,
     get_student_analysis,
     get_student_majors,
     get_student_plan,
@@ -288,11 +285,6 @@ def get_foundation_report_template_fields(product: str | None = Query(default=No
     return success_response(list_report_template_fields(product))
 
 
-@app.get("/api/foundation/admissions-schema")
-def get_foundation_admissions_schema():
-    return success_response(get_admissions_schema_overview())
-
-
 @app.get("/api/analysis/student/{student_id}")
 def get_analysis_detail(student_id: int):
     return success_response(get_student_analysis(student_id))
@@ -349,16 +341,3 @@ def post_report_export_word(student_id: int, payload: ReportExportPayload):
     )
 
 
-@app.get("/api/demo-reports/99")
-def get_demo_report_99(sample_student_id: int = Query(..., ge=1)):
-    return success_response(generate_demo_report(sample_student_id, "99"))
-
-
-@app.get("/api/demo-reports/399")
-def get_demo_report_399(sample_student_id: int = Query(..., ge=1)):
-    return success_response(generate_demo_report(sample_student_id, "399"))
-
-
-@app.get("/api/settings")
-def get_settings():
-    return success_response(get_settings_data())

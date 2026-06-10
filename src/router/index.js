@@ -10,9 +10,7 @@ const routes = [
   { path: "/majors", name: "majors", component: () => import("../pages/MajorsPage.vue") },
   { path: "/plan", name: "plan", component: () => import("../pages/PlanPage.vue") },
   { path: "/reports", name: "reports", component: () => import("../pages/ReportsPage.vue") },
-  { path: "/base-data", name: "base-data", component: () => import("../pages/BaseDataPage.vue") },
-  { path: "/demo-reports", name: "demo-reports", component: () => import("../pages/DemoReportsPage.vue") },
-  { path: "/settings", name: "settings", component: () => import("../pages/SettingsPage.vue") }
+  { path: "/base-data", name: "base-data", component: () => import("../pages/BaseDataPage.vue") }
 ];
 
 const router = createRouter({
