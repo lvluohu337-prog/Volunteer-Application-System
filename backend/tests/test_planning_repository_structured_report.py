@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 from backend.planning_repository import _build_formal_report_json, _build_structured_recommendations
 
@@ -57,18 +58,19 @@ class PlanningRepositoryStructuredReportTest(unittest.TestCase):
             "notRecommended": [{"institutionName": "某大学", "majorName": "某专业"}],
         }
 
-        report_json = _build_formal_report_json(
-            student={"name": "胡祥荟", "province": "河南", "exam_year": 2026, "subject_group": "物理类", "status": "draft"},
-            product_code="399",
-            sections=[{"title": "学生基本信息", "body": "示例"}],
-            rule_summary={"scoreLevel": "可冲可稳", "topRisks": ["计划波动待补充"]},
-            derived_profile={"constellation": "金牛座", "pillars": {}, "interestDirections": [], "regionPreferences": [], "developmentGoals": []},
-            matched_majors=["自动化类"],
-            matched_cities=["郑州"],
-            portrait_recommendation={"preferredDirection": "工科"},
-            structured_recommendations=structured_recommendations,
-            result_source={"mode": "real", "label": "真实招生结果", "isRealData": True},
-        )
+        with patch("backend.planning_repository._build_report_modules", return_value=[]):
+            report_json = _build_formal_report_json(
+                student={"name": "胡祥荟", "province": "河南", "exam_year": 2026, "subject_group": "物理类", "status": "draft"},
+                product_code="399",
+                sections=[{"title": "学生基本信息", "body": "示例"}],
+                rule_summary={"scoreLevel": "可冲可稳", "topRisks": ["计划波动待补充"]},
+                derived_profile={"constellation": "金牛座", "pillars": {}, "interestDirections": [], "regionPreferences": [], "developmentGoals": []},
+                matched_majors=["自动化类"],
+                matched_cities=["郑州"],
+                portrait_recommendation={"preferredDirection": "工科"},
+                structured_recommendations=structured_recommendations,
+                result_source={"mode": "real", "label": "真实招生结果", "isRealData": True},
+            )
 
         self.assertIn("recommendationTable", report_json)
         self.assertIn("firstChoice", report_json)

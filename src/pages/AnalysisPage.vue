@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { fetchAnalysisData } from "../api/planning.js";
+import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
 import PanelSection from "../components/PanelSection.vue";
 import StatusTag from "../components/StatusTag.vue";
@@ -123,6 +124,12 @@ const resultSourceFacts = computed(() => {
   return items;
 });
 
+const fallbackNextSteps = [
+  "先回到学生详情，补齐最新总分、位次和选科组合。",
+  "复核目标省份、院校层次和专业范围，必要时适当放宽筛选边界。",
+  "在命中真实候选前，本页内容只能用于方向讨论，不能直接作为正式填报依据。"
+];
+
 async function loadPageData() {
   loading.value = true;
   const data = await fetchAnalysisData(routeStudentId.value);
@@ -226,6 +233,17 @@ onMounted(() => {
             </span>
           </div>
         </el-card>
+
+        <FallbackRiskNotice
+          v-if="hasStudent && resultSource.mode === 'fallback'"
+          :reason="resultSource.fallbackReason"
+          :next-steps="fallbackNextSteps"
+        >
+          <template #actions>
+            <el-button @click="goToStudentDetail">查看学生详情</el-button>
+            <el-button type="primary" @click="goToPlan">进入志愿方案</el-button>
+          </template>
+        </FallbackRiskNotice>
 
         <div v-if="hasStudent" class="content-grid content-grid-analysis">
           <el-card

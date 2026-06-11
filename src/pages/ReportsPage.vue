@@ -7,7 +7,9 @@ import {
   exportReportWord,
   fetchReportData
 } from "../api/planning.js";
+import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
+import StatusTag from "../components/StatusTag.vue";
 import { COMPLIANCE_DISCLAIMER } from "../constants/compliance.js";
 
 const emit = defineEmits(["open-dialog"]);
@@ -77,6 +79,17 @@ const reportTitle = ref("");
 const reportSubtitle = ref("");
 const disclaimer = ref(COMPLIANCE_DISCLAIMER);
 const boundaryNote = ref("");
+const resultSource = ref({
+  mode: "empty",
+  label: "未生成结果",
+  isRealData: false,
+  matchedCandidateCount: 0,
+  candidateStrategy: null,
+  rankSource: null,
+  latestAdmissionYear: null,
+  fallbackReason: "",
+  notice: ""
+});
 const reportJson = ref({
   product: { description: "", targetUser: "" },
   delivery: { suggestedTotalPages: 0, manualReviewModules: [] },
@@ -126,6 +139,56 @@ const activeProduct = computed(
 const hasStructuredRecommendations = computed(
   () => recommendationTable.value.length > 0 || Boolean(firstChoice.value)
 );
+
+const resultSourceMeta = computed(() => {
+  const mode = resultSource.value.mode;
+  if (mode === "real") {
+    return {
+      title: "当前报告已命中真实招生数据",
+      tagLabel: resultSource.value.label || "真实招生结果",
+      tagVariant: "success"
+    };
+  }
+  if (mode === "real_relaxed") {
+    return {
+      title: "当前报告来自真实招生数据，但已放宽位次硬门槛",
+      tagLabel: resultSource.value.label || "真实招生结果（放宽位次）",
+      tagVariant: "review"
+    };
+  }
+  if (mode === "fallback") {
+    return {
+      title: "当前报告未命中真实招生候选，已切回画像/规则兜底",
+      tagLabel: resultSource.value.label || "画像/规则兜底结果",
+      tagVariant: "warning"
+    };
+  }
+  return {
+    title: "当前尚未生成可用正式报告结果",
+    tagLabel: resultSource.value.label || "未生成结果",
+    tagVariant: "default"
+  };
+});
+
+const resultSourceFacts = computed(() => {
+  const items = [];
+  if (resultSource.value.matchedCandidateCount) {
+    items.push(`真实候选 ${resultSource.value.matchedCandidateCount} 条`);
+  }
+  if (resultSource.value.latestAdmissionYear) {
+    items.push(`主要参考年份 ${resultSource.value.latestAdmissionYear}`);
+  }
+  if (resultSource.value.rankSource) {
+    items.push(`位次来源 ${resultSource.value.rankSource}`);
+  }
+  return items;
+});
+
+const fallbackNextSteps = [
+  "先暂停把当前报告作为正式交付版本，不要直接导出给家长或学生。",
+  "回到学生详情补齐最新成绩、位次、选科与目标边界，再重新触发推荐链路。",
+  "待命中真实招生候选后，再进入志愿方案和报告页完成人工复核与正式导出。"
+];
 
 const recommendationBuckets = computed(() => {
   const grouped = { rush: [], steady: [], safe: [] };
@@ -251,6 +314,7 @@ async function loadPageData() {
   reportSubtitle.value = data.reportSubtitle ?? "";
   disclaimer.value = data.disclaimer || COMPLIANCE_DISCLAIMER;
   boundaryNote.value = data.boundaryNote || "";
+  resultSource.value = data.resultSource ?? resultSource.value;
   reportJson.value = data.reportJson ?? reportJson.value;
   recommendationTable.value = data.recommendationTable ?? [];
   firstChoice.value = data.firstChoice ?? null;
@@ -272,6 +336,14 @@ function goToStudentDetail() {
     return;
   }
   router.push({ name: "student-detail", params: { studentId: String(studentId.value) } });
+}
+
+function goToPlan() {
+  router.push(
+    studentId.value
+      ? { name: "plan", query: { studentId: String(studentId.value) } }
+      : { name: "plan" }
+  );
 }
 
 function switchProduct(code) {
@@ -359,6 +431,43 @@ watch(
     <el-skeleton :loading="loading" animated :rows="10">
       <template #default>
         <div v-if="hasStudent" class="report-layout">
+          <el-card shadow="never" class="panel-card result-source-banner">
+            <div class="result-source-head">
+              <div>
+                <h3>{{ resultSourceMeta.title }}</h3>
+                <p>
+                  {{
+                    resultSource.notice ||
+                    resultSource.fallbackReason ||
+                    "正式交付前仍需结合官方位次、院校章程和招生计划复核。"
+                  }}
+                </p>
+              </div>
+              <StatusTag :label="resultSourceMeta.tagLabel" :variant="resultSourceMeta.tagVariant" />
+            </div>
+
+            <div v-if="resultSourceFacts.length" class="result-source-facts">
+              <span
+                v-for="item in resultSourceFacts"
+                :key="item"
+                class="result-source-fact"
+              >
+                {{ item }}
+              </span>
+            </div>
+          </el-card>
+
+          <FallbackRiskNotice
+            v-if="resultSource.mode === 'fallback'"
+            :reason="resultSource.fallbackReason"
+            :next-steps="fallbackNextSteps"
+          >
+            <template #actions>
+              <el-button @click="goToStudentDetail">查看学生详情</el-button>
+              <el-button type="primary" @click="goToPlan">返回志愿方案</el-button>
+            </template>
+          </FallbackRiskNotice>
+
           <el-card shadow="never" class="panel-card report-outline">
             <div class="product-head">
               <div>
@@ -938,6 +1047,51 @@ watch(
 </template>
 
 <style scoped>
+.result-source-banner {
+  gap: 14px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.88));
+}
+
+.result-source-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.result-source-head h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--app-text-primary);
+}
+
+.result-source-head p {
+  margin: 0;
+  color: var(--app-text-secondary);
+  line-height: 1.7;
+}
+
+.result-source-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.result-source-fact {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--app-text-secondary);
+  font-size: 13px;
+}
+
 .product-head {
   display: flex;
   align-items: flex-start;
@@ -1364,6 +1518,7 @@ watch(
 }
 
 @media (max-width: 767px) {
+  .result-source-head,
   .section-head,
   .bucket-stat-head,
   .decision-head,

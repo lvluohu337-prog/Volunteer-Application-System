@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 import io
 from pathlib import Path
 import zipfile
@@ -74,6 +74,8 @@ def _build_report_blocks(
         ReportBlock("meta", export_meta),
     ]
 
+    _append_structured_recommendation_blocks(blocks, report_data)
+
     for section in report_data.get("sections") or []:
         if not isinstance(section, dict):
             continue
@@ -100,6 +102,135 @@ def _build_report_blocks(
         blocks.append(ReportBlock("signature", "咨询师签字：________________    家长确认：________________"))
 
     return [block for block in blocks if block.text.strip()]
+
+
+def _append_structured_recommendation_blocks(
+    blocks: list[ReportBlock],
+    report_data: dict[str, object],
+) -> None:
+    recommendation_table = [item for item in (report_data.get("recommendationTable") or []) if isinstance(item, dict)]
+    first_choice = report_data.get("firstChoice") if isinstance(report_data.get("firstChoice"), dict) else None
+    alternatives = [item for item in (report_data.get("alternatives") or []) if isinstance(item, dict)]
+    not_recommended = [item for item in (report_data.get("notRecommended") or []) if isinstance(item, dict)]
+
+    if not any([recommendation_table, first_choice, alternatives, not_recommended]):
+        return
+
+    blocks.append(ReportBlock("heading", "正式院校专业推荐表"))
+    blocks.append(
+        ReportBlock(
+            "body",
+            f"本次导出共包含 {len(recommendation_table)} 条结构化推荐，以下内容用于正式交付前的院校专业复核。",
+        )
+    )
+
+    grouped: dict[str, list[dict[str, object]]] = {"rush": [], "steady": [], "safe": []}
+    for item in recommendation_table:
+        bucket = str(item.get("bucket") or "")
+        if bucket in grouped:
+            grouped[bucket].append(item)
+        else:
+            grouped["steady"].append(item)
+
+    for bucket_key, bucket_label in (("rush", "冲刺推荐"), ("steady", "稳妥推荐"), ("safe", "保底推荐")):
+        items = grouped[bucket_key]
+        if not items:
+            continue
+        blocks.append(ReportBlock("heading", bucket_label))
+        for item in items:
+            blocks.extend(_build_recommendation_blocks(item, include_bucket=False))
+
+    if first_choice:
+        blocks.append(ReportBlock("heading", "第一志愿建议"))
+        blocks.extend(_build_recommendation_blocks(first_choice, include_bucket=True))
+
+    if alternatives:
+        blocks.append(ReportBlock("heading", "备选志愿建议"))
+        for item in alternatives[:5]:
+            blocks.extend(_build_recommendation_blocks(item, include_bucket=True, condensed=True))
+
+    if not_recommended:
+        blocks.append(ReportBlock("heading", "不建议优先报考"))
+        for item in not_recommended[:5]:
+            blocks.append(ReportBlock("bullet", _build_not_recommended_text(item)))
+
+
+def _build_recommendation_blocks(
+    item: dict[str, object],
+    *,
+    include_bucket: bool,
+    condensed: bool = False,
+) -> list[ReportBlock]:
+    blocks = [ReportBlock("bullet", _build_recommendation_summary(item, include_bucket=include_bucket))]
+
+    detail_parts: list[str] = []
+    recommendation_reason = str(item.get("recommendationReason") or "").strip()
+    risk_summary = str(item.get("riskSummary") or "").strip()
+    adjustment_advice = item.get("adjustmentAdvice") if isinstance(item.get("adjustmentAdvice"), dict) else None
+    city_path_note = str(item.get("cityPathNote") or "").strip()
+
+    if recommendation_reason:
+        detail_parts.append(f"推荐理由：{recommendation_reason}")
+    if risk_summary:
+        detail_parts.append(f"风险摘要：{risk_summary}")
+    if adjustment_advice:
+        label = str(adjustment_advice.get("label") or "").strip()
+        detail = str(adjustment_advice.get("detail") or "").strip()
+        if label or detail:
+            detail_parts.append(f"调剂建议：{label}{'，' + detail if detail else ''}")
+    if city_path_note and not condensed:
+        detail_parts.append(f"城市路径：{city_path_note}")
+
+    if detail_parts:
+        blocks.append(ReportBlock("body", "；".join(detail_parts)))
+
+    return blocks
+
+
+def _build_recommendation_summary(item: dict[str, object], *, include_bucket: bool) -> str:
+    title = f"{item.get('institutionName') or '目标院校'} - {item.get('majorName') or '目标专业'}"
+    parts = [title]
+
+    if include_bucket and item.get("bucket"):
+        parts.append(f"档位：{_bucket_label(str(item.get('bucket') or ''))}")
+    if item.get("planGroupCode"):
+        parts.append(f"专业组：{item.get('planGroupCode')}")
+    if item.get("cityText") or item.get("city") or item.get("province"):
+        parts.append(f"城市：{item.get('cityText') or item.get('city') or item.get('province')}")
+    if item.get("minScore") not in (None, ""):
+        parts.append(f"最低分：{_format_number(item.get('minScore'))}")
+    if item.get("minRank") not in (None, ""):
+        parts.append(f"最低位次：{_format_number(item.get('minRank'))}")
+    if item.get("rankGap") not in (None, ""):
+        parts.append(f"位次差：{item.get('rankGap')}")
+    if item.get("riskLabel"):
+        parts.append(f"风险：{item.get('riskLabel')}")
+
+    return " / ".join(str(part) for part in parts if str(part).strip())
+
+
+def _build_not_recommended_text(item: dict[str, object]) -> str:
+    title = f"{item.get('institutionName') or '目标院校'} - {item.get('majorName') or '目标专业'}"
+    reason = str(item.get("reason") or item.get("riskSummary") or "建议暂不优先纳入正式志愿表。").strip()
+    return f"{title}：{reason}"
+
+
+def _bucket_label(bucket: str) -> str:
+    return {
+        "rush": "冲刺",
+        "steady": "稳妥",
+        "safe": "保底",
+    }.get(bucket, "待复核")
+
+
+def _format_number(value: object) -> str:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if numeric.is_integer():
+        return str(int(numeric))
+    return f"{numeric:.1f}"
 
 
 def _build_docx_document_xml(blocks: list[ReportBlock]) -> str:
@@ -177,7 +308,7 @@ def _build_docx_document_rels_xml() -> str:
 
 def _build_docx_core_xml(report_data: dict[str, object]) -> str:
     title = escape(str(report_data.get("reportTitle") or "志愿规划报告"))
-    created = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    created = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     return f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties
     xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"

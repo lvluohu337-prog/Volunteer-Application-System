@@ -114,9 +114,9 @@
 - [x] 在后端响应中增加“真实招生结果 / fallback 结果”标记
 - [x] `src/pages/AnalysisPage.vue` 明确展示当前结果来源
 - [x] `src/pages/MajorsPage.vue` 明确展示当前结果来源
-- [ ] `src/pages/PlanPage.vue` 明确展示当前结果来源
-- [ ] `src/pages/ReportsPage.vue` 明确展示当前结果来源
-- [ ] 当未命中真实招生数据时，统一显示醒目的风险提示和后续操作建议
+- [x] `src/pages/PlanPage.vue` 明确展示当前结果来源
+- [x] `src/pages/ReportsPage.vue` 明确展示当前结果来源
+- [x] 当未命中真实招生数据时，统一显示醒目的风险提示和后续操作建议
 
 #### 报告导出正式化
 

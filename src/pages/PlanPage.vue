@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { fetchPlanData } from "../api/planning.js";
+import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
 import StatusTag from "../components/StatusTag.vue";
 
@@ -19,6 +20,17 @@ const hasStudent = ref(false);
 const studentId = ref(null);
 const columns = ref([]);
 const disclaimer = ref("");
+const resultSource = ref({
+  mode: "empty",
+  label: "未生成结果",
+  isRealData: false,
+  matchedCandidateCount: 0,
+  candidateStrategy: null,
+  rankSource: null,
+  latestAdmissionYear: null,
+  fallbackReason: "",
+  notice: ""
+});
 const portraitRecommendation = ref({ ...emptyPortraitRecommendation });
 const ruleSummary = ref({
   strategy: { rush_ratio: 0, steady_ratio: 0, safe_ratio: 0 },
@@ -30,6 +42,56 @@ const ruleSummary = ref({
 const preferredDirection = computed(
   () => ruleSummary.value.preferredDirection || portraitRecommendation.value.preferredDirection || "待补充画像信息"
 );
+
+const resultSourceMeta = computed(() => {
+  const mode = resultSource.value.mode;
+  if (mode === "real") {
+    return {
+      title: "当前结果已命中真实招生数据",
+      tagLabel: resultSource.value.label || "真实招生结果",
+      tagVariant: "success"
+    };
+  }
+  if (mode === "real_relaxed") {
+    return {
+      title: "当前结果来自真实招生数据，但已放宽位次硬门槛",
+      tagLabel: resultSource.value.label || "真实招生结果（放宽位次）",
+      tagVariant: "review"
+    };
+  }
+  if (mode === "fallback") {
+    return {
+      title: "当前结果未命中真实招生候选，已切回画像/规则兜底",
+      tagLabel: resultSource.value.label || "画像/规则兜底结果",
+      tagVariant: "warning"
+    };
+  }
+  return {
+    title: "当前尚未生成可用志愿方案结果",
+    tagLabel: resultSource.value.label || "未生成结果",
+    tagVariant: "default"
+  };
+});
+
+const resultSourceFacts = computed(() => {
+  const items = [];
+  if (resultSource.value.matchedCandidateCount) {
+    items.push(`真实候选 ${resultSource.value.matchedCandidateCount} 条`);
+  }
+  if (resultSource.value.latestAdmissionYear) {
+    items.push(`主要参考年份 ${resultSource.value.latestAdmissionYear}`);
+  }
+  if (resultSource.value.rankSource) {
+    items.push(`位次来源 ${resultSource.value.rankSource}`);
+  }
+  return items;
+});
+
+const fallbackNextSteps = [
+  "先回到学生详情，补齐最新成绩、位次、选科和调剂接受边界。",
+  "在命中真实候选前，不要直接把当前冲稳保方案用于正式填报或对外承诺。",
+  "可先回评估分析页核对风险分层，再等待真实数据命中后生成正式报告。"
+];
 
 function parseStudentId() {
   const rawValue = route.query.studentId;
@@ -47,6 +109,7 @@ async function loadPageData() {
   studentId.value = data.studentId ?? null;
   columns.value = data.columns ?? [];
   disclaimer.value = data.disclaimer ?? "";
+  resultSource.value = data.resultSource ?? resultSource.value;
   ruleSummary.value = data.ruleSummary ?? ruleSummary.value;
   portraitRecommendation.value = data.portraitRecommendation ?? { ...emptyPortraitRecommendation };
   loading.value = false;
@@ -57,6 +120,14 @@ function goToReport() {
     studentId.value
       ? { name: "reports", query: { studentId: String(studentId.value) } }
       : { name: "reports" }
+  );
+}
+
+function goToAnalysis() {
+  router.push(
+    studentId.value
+      ? { name: "analysis", query: { studentId: String(studentId.value) } }
+      : { name: "analysis" }
   );
 }
 
@@ -98,6 +169,43 @@ onMounted(() => {
 
     <el-skeleton :loading="loading" animated :rows="8">
       <template #default>
+        <el-card v-if="hasStudent" shadow="never" class="panel-card result-source-banner">
+          <div class="result-source-head">
+            <div>
+              <h3>{{ resultSourceMeta.title }}</h3>
+              <p>
+                {{
+                  resultSource.notice ||
+                  resultSource.fallbackReason ||
+                  "正式填报前仍需结合官方位次、院校章程和招生计划复核。"
+                }}
+              </p>
+            </div>
+            <StatusTag :label="resultSourceMeta.tagLabel" :variant="resultSourceMeta.tagVariant" />
+          </div>
+
+          <div v-if="resultSourceFacts.length" class="result-source-facts">
+            <span
+              v-for="item in resultSourceFacts"
+              :key="item"
+              class="result-source-fact"
+            >
+              {{ item }}
+            </span>
+          </div>
+        </el-card>
+
+        <FallbackRiskNotice
+          v-if="hasStudent && resultSource.mode === 'fallback'"
+          :reason="resultSource.fallbackReason"
+          :next-steps="fallbackNextSteps"
+        >
+          <template #actions>
+            <el-button @click="goToStudentDetail">查看学生详情</el-button>
+            <el-button type="primary" @click="goToAnalysis">返回评估分析</el-button>
+          </template>
+        </FallbackRiskNotice>
+
         <div v-if="hasStudent" class="summary-grid">
           <el-card shadow="never" class="panel-card summary-card">
             <h3>冲稳保比例</h3>
@@ -185,6 +293,50 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.result-source-banner {
+  gap: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.88));
+}
+
+.result-source-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.result-source-head h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--app-text-primary);
+}
+
+.result-source-head p {
+  margin: 0;
+  color: var(--app-text-secondary);
+  line-height: 1.7;
+}
+
+.result-source-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.result-source-fact {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--app-text-secondary);
+  font-size: 13px;
+}
+
 .focus-card {
   margin-bottom: 16px;
 }
@@ -236,6 +388,7 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .result-source-head,
   .focus-head,
   .column-head {
     flex-direction: column;

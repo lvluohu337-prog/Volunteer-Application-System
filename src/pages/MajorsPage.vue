@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { fetchMajorsData } from "../api/planning.js";
+import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
 import StatusTag from "../components/StatusTag.vue";
 
@@ -102,6 +103,12 @@ const resultSourceFacts = computed(() => {
   return items;
 });
 
+const fallbackNextSteps = [
+  "先在学生详情中核对最新成绩、位次、选科和家长诉求是否完整。",
+  "把当前专业方向只作为沟通素材，不直接当作正式报考结论。",
+  "继续进入志愿方案页复核冲稳保结构，或等待真实招生候选命中后再做定稿。"
+];
+
 function parseStudentId() {
   const rawValue = route.query.studentId;
   if (!rawValue) {
@@ -196,6 +203,17 @@ onMounted(() => {
             </span>
           </div>
         </el-card>
+
+        <FallbackRiskNotice
+          v-if="hasStudent && resultSource.mode === 'fallback'"
+          :reason="resultSource.fallbackReason"
+          :next-steps="fallbackNextSteps"
+        >
+          <template #actions>
+            <el-button @click="goToStudentDetail">查看学生详情</el-button>
+            <el-button type="primary" @click="goToPlan">进入志愿方案</el-button>
+          </template>
+        </FallbackRiskNotice>
 
         <div v-if="hasStudent" class="summary-grid">
           <el-card shadow="never" class="panel-card summary-card">

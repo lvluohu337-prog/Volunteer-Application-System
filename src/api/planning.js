@@ -305,6 +305,10 @@ export async function fetchPlanData(studentId, params = {}) {
     return {
       ...emptyStudentDrivenState,
       columns: [],
+      resultSource: {
+        ...emptyResultSource,
+        fallbackReason: "请先录入真实学生档案，再查看志愿方案建议。"
+      },
       disclaimer: "请先录入真实学生档案，再查看志愿方案建议。"
     };
   }
@@ -328,6 +332,10 @@ export async function fetchReportData(studentId, productCode = "399") {
       sections: [],
       reportTitle: "暂无可用报告",
       reportSubtitle: "请先录入真实学生档案",
+      resultSource: {
+        ...emptyResultSource,
+        fallbackReason: "请先录入真实学生档案，再生成报告预览。"
+      },
       disclaimer: "请先录入真实学生档案，再生成报告预览。"
     };
   }

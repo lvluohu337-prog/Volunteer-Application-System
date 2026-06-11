@@ -23,6 +23,75 @@ SAMPLE_REPORT = {
     "reportTitle": "胡祥荟 志愿规划报告",
     "reportSubtitle": "河南 2026 届高考考生 / 399 报告预览",
     "activeProductLabel": "399 咨询版",
+    "recommendationTable": [
+        {
+            "bucket": "steady",
+            "institutionName": "郑州大学",
+            "majorName": "自动化类",
+            "planGroupCode": "Q04",
+            "cityText": "郑州",
+            "minScore": 612,
+            "minRank": 12543,
+            "rankGap": "领先 328",
+            "riskLabel": "需复核",
+            "recommendationReason": "当前位次与专业方向匹配度较高，可作为主力志愿样本。",
+            "riskSummary": "计划波动需要结合当年招生计划复核。",
+            "adjustmentAdvice": {
+                "label": "可单独沟通",
+                "detail": "正式填报前建议单独确认调剂边界。"
+            },
+            "cityPathNote": "郑州适合继续围绕自动化与智能制造路径做实习和考研规划。"
+        },
+        {
+            "bucket": "safe",
+            "institutionName": "河南工业大学",
+            "majorName": "计算机科学与技术",
+            "planGroupCode": "Q12",
+            "cityText": "郑州",
+            "minScore": 598,
+            "minRank": 16880,
+            "rankGap": "领先 4665",
+            "riskLabel": "相对稳妥",
+            "recommendationReason": "作为保底样本可兼顾专业接受度与城市路径。",
+            "riskSummary": "仍需复核专业组内调剂方向。",
+        },
+    ],
+    "firstChoice": {
+        "bucket": "steady",
+        "institutionName": "郑州大学",
+        "majorName": "自动化类",
+        "planGroupCode": "Q04",
+        "cityText": "郑州",
+        "minScore": 612,
+        "minRank": 12543,
+        "rankGap": "领先 328",
+        "riskLabel": "需复核",
+        "recommendationReason": "适合作为第一志愿主力样本。",
+        "riskSummary": "需要结合当年招生计划与专业组变化复核。",
+        "adjustmentAdvice": {
+            "label": "可单独沟通",
+            "detail": "建议和家长明确调剂接受边界。"
+        },
+        "cityPathNote": "郑州路径清晰，适合围绕自动化继续做升学与就业规划。"
+    },
+    "alternatives": [
+        {
+            "bucket": "safe",
+            "institutionName": "河南工业大学",
+            "majorName": "计算机科学与技术",
+            "planGroupCode": "Q12",
+            "cityText": "郑州",
+            "riskLabel": "相对稳妥",
+            "recommendationReason": "适合作为备选方案。",
+        }
+    ],
+    "notRecommended": [
+        {
+            "institutionName": "某大学",
+            "majorName": "某专业",
+            "reason": "当前位次和专业边界不适合作为优先填报选项。"
+        }
+    ],
     "sections": [
         {"title": "学生基本信息", "body": "胡祥荟，河南，2026 届高考考生，当前选科/方向为物理类。"},
         {"title": "专业与学校建议", "body": "当前优先命中的真实专业方向为计算机类 / 地理科学类 / 计算机科学与技术。"},
@@ -39,8 +108,7 @@ SAMPLE_REPORT = {
 
 class ReportExporterTest(unittest.TestCase):
     def setUp(self):
-        Path("C:\\tmp").mkdir(parents=True, exist_ok=True)
-        self.temp_dir = Path(tempfile.mkdtemp(prefix="report-export-", dir="C:\\tmp"))
+        self.temp_dir = Path(tempfile.mkdtemp(prefix="report-export-"))
 
     def tearDown(self):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
@@ -80,6 +148,10 @@ class ReportExporterTest(unittest.TestCase):
             document_xml = archive.read("word/document.xml").decode("utf-8")
 
         self.assertIn("胡祥荟 志愿规划报告", document_xml)
+        self.assertIn("正式院校专业推荐表", document_xml)
+        self.assertIn("第一志愿建议", document_xml)
+        self.assertIn("郑州大学 - 自动化类", document_xml)
+        self.assertIn("不建议优先报考", document_xml)
         self.assertIn("咨询师签字", document_xml)
 
     def test_export_report_package_returns_final_document_metadata(self):
