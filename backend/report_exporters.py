@@ -20,7 +20,10 @@ PDF_MARGIN_BOTTOM = 56.0
 @dataclass(frozen=True)
 class ReportBlock:
     style: str
-    text: str
+    text: str = ""
+    table_headers: tuple[str, ...] = ()
+    table_rows: tuple[tuple[str, ...], ...] = ()
+    table_column_widths: tuple[float, ...] = ()
 
 
 def export_report_docx(
@@ -101,7 +104,7 @@ def _build_report_blocks(
         blocks.append(ReportBlock("heading", "签字确认"))
         blocks.append(ReportBlock("signature", "咨询师签字：________________    家长确认：________________"))
 
-    return [block for block in blocks if block.text.strip()]
+    return [block for block in blocks if block.text.strip() or block.table_rows]
 
 
 def _append_structured_recommendation_blocks(
@@ -137,8 +140,7 @@ def _append_structured_recommendation_blocks(
         if not items:
             continue
         blocks.append(ReportBlock("heading", bucket_label))
-        for item in items:
-            blocks.extend(_build_recommendation_blocks(item, include_bucket=False))
+        blocks.append(_build_recommendation_table_block(items))
 
     if first_choice:
         blocks.append(ReportBlock("heading", "第一志愿建议"))
@@ -185,6 +187,29 @@ def _build_recommendation_blocks(
         blocks.append(ReportBlock("body", "；".join(detail_parts)))
 
     return blocks
+
+
+def _build_recommendation_table_block(items: list[dict[str, object]]) -> ReportBlock:
+    headers = ("院校 / 专业", "专业组", "城市", "最低分", "最低位次", "位次差", "风险")
+    rows: list[tuple[str, ...]] = []
+    for item in items:
+        rows.append(
+            (
+                f"{item.get('institutionName') or '目标院校'} / {item.get('majorName') or '目标专业'}",
+                str(item.get("planGroupCode") or "-"),
+                str(item.get("cityText") or item.get("city") or item.get("province") or "-"),
+                _format_number(item.get("minScore")) if item.get("minScore") not in (None, "") else "-",
+                _format_number(item.get("minRank")) if item.get("minRank") not in (None, "") else "-",
+                str(item.get("rankGap") or "-"),
+                str(item.get("riskLabel") or "-"),
+            )
+        )
+    return ReportBlock(
+        "table",
+        table_headers=headers,
+        table_rows=tuple(rows),
+        table_column_widths=(158.0, 54.0, 50.0, 46.0, 60.0, 58.0, 63.28),
+    )
 
 
 def _build_recommendation_summary(item: dict[str, object], *, include_bucket: bool) -> str:
@@ -236,6 +261,9 @@ def _format_number(value: object) -> str:
 def _build_docx_document_xml(blocks: list[ReportBlock]) -> str:
     paragraphs: list[str] = []
     for block in blocks:
+        if block.table_rows:
+            paragraphs.extend(_build_docx_table_paragraphs(block))
+            continue
         style_id = _docx_style_id(block.style)
         for line in _split_block_lines(block.text):
             if not line:
@@ -255,6 +283,15 @@ def _build_docx_document_xml(blocks: list[ReportBlock]) -> str:
         "</w:sectPr>"
         "</w:body></w:document>"
     )
+
+
+def _build_docx_table_paragraphs(block: ReportBlock) -> list[str]:
+    paragraphs: list[str] = []
+    header_line = " | ".join(block.table_headers)
+    paragraphs.append(_docx_paragraph_xml(header_line, style_id="Subtitle"))
+    for row in block.table_rows:
+        paragraphs.append(_docx_paragraph_xml(" | ".join(row), style_id="Normal"))
+    return paragraphs
 
 
 def _docx_paragraph_xml(text: str, *, style_id: str) -> str:
@@ -417,6 +454,14 @@ def _build_pdf_page_streams(blocks: list[ReportBlock]) -> list[str]:
         y = PDF_PAGE_HEIGHT - PDF_MARGIN_TOP
 
     for block in blocks:
+        if block.table_rows:
+            y = _append_pdf_table(
+                block,
+                get_commands=lambda: current_commands,
+                current_y=y,
+                flush_page=flush_page,
+            )
+            continue
         spec = styles.get(block.style, styles["body"])
         y -= spec["before"]
         max_units = max(12.0, (usable_width - spec["indent"]) / spec["size"])
@@ -444,6 +489,114 @@ def _build_pdf_page_streams(blocks: list[ReportBlock]) -> list[str]:
     if current_commands or not page_streams:
         flush_page()
     return page_streams
+
+
+def _append_pdf_table(
+    block: ReportBlock,
+    *,
+    get_commands,
+    current_y: float,
+    flush_page,
+) -> float:
+    headers = list(block.table_headers)
+    rows = [list(row) for row in block.table_rows]
+    widths = list(block.table_column_widths) if block.table_column_widths else []
+    if not headers or not rows:
+        return current_y
+    if not widths:
+        usable_width = PDF_PAGE_WIDTH - PDF_MARGIN_LEFT - PDF_MARGIN_RIGHT
+        widths = [usable_width / len(headers)] * len(headers)
+
+    padding_x = 5.0
+    padding_y = 4.0
+    header_font_size = 9.0
+    row_font_size = 8.8
+    line_height = 11.5
+    y = current_y - 4.0
+
+    def wrap_cells(cells: list[str], *, font_size: float) -> list[list[str]]:
+        wrapped: list[list[str]] = []
+        for index, cell in enumerate(cells):
+            width = widths[index]
+            max_units = max(4.0, (width - padding_x * 2) / max(font_size, 1.0))
+            lines = _wrap_text(cell or "-", max_units=max_units)
+            wrapped.append(lines or ["-"])
+        return wrapped
+
+    def draw_row(
+        cells: list[str],
+        *,
+        top_y: float,
+        font_size: float,
+        fill_rgb: str,
+        text_color: str,
+        is_header: bool,
+    ) -> float:
+        wrapped_cells = wrap_cells(cells, font_size=font_size)
+        max_lines = max(len(lines) for lines in wrapped_cells)
+        row_height = padding_y * 2 + max_lines * line_height
+        bottom_y = top_y - row_height
+        x = PDF_MARGIN_LEFT
+        border_rgb = "0.78 0.84 0.92 RG"
+
+        for index, width in enumerate(widths):
+            get_commands().append(
+                f"q {fill_rgb} {border_rgb} {x:.2f} {bottom_y:.2f} {width:.2f} {row_height:.2f} re B Q"
+            )
+            text_y = top_y - padding_y - font_size
+            for line in wrapped_cells[index]:
+                get_commands().append(
+                    _pdf_text_command(
+                        text=line,
+                        x=x + padding_x,
+                        y=text_y,
+                        font_size=font_size,
+                        color_command=text_color,
+                    )
+                )
+                text_y -= line_height
+            x += width
+        return bottom_y
+
+    wrapped_headers = wrap_cells(headers, font_size=header_font_size)
+    header_height = padding_y * 2 + max(len(lines) for lines in wrapped_headers) * line_height
+    if y - header_height < PDF_MARGIN_BOTTOM:
+        flush_page()
+        y = PDF_PAGE_HEIGHT - PDF_MARGIN_TOP
+    y = draw_row(
+        headers,
+        top_y=y,
+        font_size=header_font_size,
+        fill_rgb="0.91 0.95 1 rg",
+        text_color="0.07 0.23 0.56 rg",
+        is_header=True,
+    )
+
+    for row_index, row in enumerate(rows):
+        wrapped_cells = wrap_cells(row, font_size=row_font_size)
+        row_height = padding_y * 2 + max(len(lines) for lines in wrapped_cells) * line_height
+        if y - row_height < PDF_MARGIN_BOTTOM:
+            flush_page()
+            y = PDF_PAGE_HEIGHT - PDF_MARGIN_TOP
+            y = draw_row(
+                headers,
+                top_y=y,
+                font_size=header_font_size,
+                fill_rgb="0.91 0.95 1 rg",
+                text_color="0.07 0.23 0.56 rg",
+                is_header=True,
+            )
+        fill_rgb = "0.985 0.99 1 rg" if row_index % 2 == 0 else "1 1 1 rg"
+        y = draw_row(
+            row,
+            top_y=y,
+            font_size=row_font_size,
+            fill_rgb=fill_rgb,
+            text_color="0 0 0 rg",
+            is_header=False,
+        )
+
+    return y - 8.0
 
 
 def _build_pdf_bytes(page_streams: list[str]) -> bytes:

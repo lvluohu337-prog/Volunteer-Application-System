@@ -128,6 +128,11 @@ class ReportExporterTest(unittest.TestCase):
 
         reader = PdfReader(str(artifact_path))
         self.assertGreaterEqual(len(reader.pages), 1)
+        extracted_text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        self.assertIn("正式院校专业推荐表", extracted_text)
+        self.assertIn("最低位次", extracted_text)
+        self.assertIn("郑州大学 / 自动化类", extracted_text)
+        self.assertIn("第一志愿建议", extracted_text)
 
     def test_export_report_docx_generates_real_docx(self):
         artifact_path = self.temp_dir / "sample.docx"
