@@ -122,25 +122,25 @@
 
 - [x] `backend/report_exporters.py` 接入结构化推荐表导出
 - [x] PDF 中展示清晰的冲 / 稳 / 保推荐表
-- [ ] DOCX 中展示清晰的冲 / 稳 / 保推荐表
-- [ ] 导出中展示专业组/代码、最低分、最低位次、位次差、风险等级、推荐理由
-- [ ] 导出中补齐调剂风险、选科限制、计划变化风险、热门专业风险提示
-- [ ] 导出中补齐第一志愿、备选志愿、不建议报考项
+- [x] DOCX 中展示清晰的冲 / 稳 / 保推荐表
+- [x] 导出中展示专业组/代码、最低分、最低位次、位次差、风险等级、推荐理由
+- [x] 导出中补齐调剂风险、选科限制、计划变化风险、热门专业风险提示
+- [x] 导出中补齐第一志愿、备选志愿、不建议报考项
 
 #### 下载链路
 
-- [ ] 增加正式下载接口，而不是只返回服务器本地文件路径
-- [ ] 前端点击“导出 PDF / Word”后可直接下载文件
-- [ ] 导出记录页优先展示可访问的下载入口，而不只是磁盘路径
-- [ ] 核验桌面联调和浏览器访问两种场景下的下载行为一致性
+- [x] 增加正式下载接口，而不是只返回服务器本地文件路径
+- [x] 前端点击“导出 PDF / Word”后可直接下载文件
+- [x] 导出记录页优先展示可访问的下载入口，而不只是磁盘路径
+- [x] 核验桌面联调和浏览器访问两种场景下的下载行为一致性
 
 #### 测试稳定性
 
-- [ ] 将 `backend/tests/test_report_export.py` 拆成“纯 exporter 单测”和“最小集成测试”
-- [ ] 移除 exporter 单测对 `planning_repository` 的直接依赖
-- [ ] 导出单测统一使用最小 mock `report_data`
-- [ ] 单个测试文件命令统一加超时约束，确保不会长时间卡住
-- [ ] 建立导出链路最小回归测试
+- [x] 将 `backend/tests/test_report_export.py` 拆成“纯 exporter 单测”和“最小集成测试”
+- [x] 移除 exporter 单测对 `planning_repository` 的直接依赖
+- [x] 导出单测统一使用最小 mock `report_data`
+- [x] 单个测试文件命令统一加超时约束，确保不会长时间卡住
+- [x] 建立导出链路最小回归测试
 
 #### 产品口径
 
@@ -230,7 +230,7 @@
 2. 区分“真实招生结果”和“fallback 结果”
 3. `backend/report_exporters.py` 结构化推荐表导出
 4. 正式下载链路
-5. `backend/tests/test_report_export.py` 单测/集成拆分与超时约束
+5. `backend/tests/test_report_exporter_unit.py` / `backend/tests/test_report_export_integration.py` 单测/集成拆分与超时约束
 6. 统一产品版本口径
 7. 本地专业 / 城市 / 画像解释库
 8. 699 / 999 深度版能力
@@ -553,15 +553,21 @@ rg -n "export/pdf|export/word|downloadUrl|artifact_path" backend src
 
 3. 拆分导出测试
 文件：
-- `backend/tests/test_report_export.py`
+- `backend/tests/report_export_fixtures.py`
+- `backend/tests/test_report_exporter_unit.py`
+- `backend/tests/test_report_export_integration.py`
+- `backend/scripts/run_unittest_module.py`
 - `backend/report_exporters.py`
 命令：
 ```powershell
-Get-Content backend/tests/test_report_export.py -Encoding utf8
-.\.venv\Scripts\python.exe -m unittest backend.tests.test_report_export
+Get-Content backend/tests/test_report_exporter_unit.py -Encoding utf8
+Get-Content backend/tests/test_report_export_integration.py -Encoding utf8
+.\.venv\Scripts\python.exe backend\scripts\run_unittest_module.py backend.tests.test_report_exporter_unit --timeout-seconds 30
+.\.venv\Scripts\python.exe backend\scripts\run_unittest_module.py backend.tests.test_report_export_integration --timeout-seconds 30
 ```
 验收：
-- 单测可独立覆盖 exporter，最小集成测试只保留一条。
+- 纯 exporter 单测不再直接依赖 `planning_repository`
+- 导出链路最小回归测试可独立验证 `export_report_package`
 
 4. 进行本地联调验证
 文件：
@@ -662,7 +668,7 @@ rg -n "699|999|99|399|设置模块待完善|占位页" src backend
 - `src/pages/*.vue`
 命令：
 ```powershell
-.\.venv\Scripts\python.exe -m unittest backend.tests.test_admissions_engine backend.tests.test_planning_repository_structured_report backend.tests.test_report_export
+.\.venv\Scripts\python.exe -m unittest backend.tests.test_admissions_engine backend.tests.test_planning_repository_structured_report backend.tests.test_report_exporter_unit backend.tests.test_report_export_integration
 npm run build
 ```
 验收：

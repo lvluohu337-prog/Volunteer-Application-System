@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from backend.database import init_db
 from backend.foundation_repository import (
@@ -16,6 +17,7 @@ from backend.intake_inference import derive_birth_profile
 from backend.planning_repository import (
     create_report_advisor_note,
     export_report_package,
+    get_report_delivery_download,
     get_dashboard_data,
     get_student_analysis,
     get_student_majors,
@@ -338,6 +340,16 @@ def post_report_export_word(student_id: int, payload: ReportExportPayload):
     return success_response(
         export_report_package(student_id, payload, export_format="word"),
         message="report word exported",
+    )
+
+
+@app.get("/api/reports/student/{student_id}/deliveries/{record_id}/download")
+def get_report_delivery_file(student_id: int, record_id: int):
+    artifact = get_report_delivery_download(student_id, record_id)
+    return FileResponse(
+        path=artifact["artifactPath"],
+        media_type=artifact["mediaType"],
+        filename=artifact["artifactName"],
     )
 
 

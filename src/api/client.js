@@ -45,6 +45,36 @@ function buildUrl(path, query) {
   return `${basePath}${buildQueryString(query)}`;
 }
 
+function parseContentDispositionFilename(headerValue) {
+  if (!headerValue) {
+    return "";
+  }
+
+  const utf8Match = headerValue.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+
+  const plainMatch = headerValue.match(/filename="?([^"]+)"?/i);
+  return plainMatch?.[1] ?? "";
+}
+
+function triggerBrowserDownload(blob, filename) {
+  const objectUrl = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename || "download";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000);
+}
+
 function resolveResponsePayload(payload, unwrapData = true) {
   if (
     unwrapData &&
@@ -101,4 +131,46 @@ export async function apiRequest(path, options = {}) {
   }
 }
 
-export { API_BASE_URL, USE_MOCK, buildQueryString, normalizeQuery };
+export async function downloadRequest(path, options = {}) {
+  const {
+    query,
+    body,
+    method = body ? "POST" : "GET",
+    filename,
+    ...fetchOptions
+  } = options;
+
+  const headers = {
+    ...(fetchOptions.headers ?? {})
+  };
+  if (body !== undefined && !Object.prototype.hasOwnProperty.call(headers, "Content-Type")) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const response = await fetch(buildUrl(path, query), {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    ...fetchOptions
+  });
+
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const resolvedFilename =
+    filename ||
+    parseContentDispositionFilename(response.headers.get("Content-Disposition")) ||
+    "download";
+
+  triggerBrowserDownload(blob, resolvedFilename);
+
+  return {
+    filename: resolvedFilename,
+    contentType: response.headers.get("Content-Type") || blob.type || "",
+    size: blob.size,
+  };
+}
+
+export { API_BASE_URL, USE_MOCK, buildQueryString, buildUrl, normalizeQuery };

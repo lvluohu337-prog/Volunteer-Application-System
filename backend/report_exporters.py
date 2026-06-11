@@ -15,6 +15,19 @@ PDF_MARGIN_LEFT = 52.0
 PDF_MARGIN_RIGHT = 52.0
 PDF_MARGIN_TOP = 56.0
 PDF_MARGIN_BOTTOM = 56.0
+HOT_MAJOR_KEYWORDS = (
+    "计算机",
+    "人工智能",
+    "软件",
+    "电子信息",
+    "通信",
+    "自动化",
+    "电气",
+    "临床",
+    "口腔",
+    "法学",
+    "师范",
+)
 
 
 @dataclass(frozen=True)
@@ -144,15 +157,36 @@ def _append_structured_recommendation_blocks(
 
     if first_choice:
         blocks.append(ReportBlock("heading", "第一志愿建议"))
+        blocks.append(
+            ReportBlock(
+                "body",
+                "以下为本轮优先建议的一志愿样本，请在正式提交前结合专业组边界、调剂接受度和计划波动做最终确认。",
+            )
+        )
+        blocks.append(_build_first_choice_table_block(first_choice))
         blocks.extend(_build_recommendation_blocks(first_choice, include_bucket=True))
 
     if alternatives:
         blocks.append(ReportBlock("heading", "备选志愿建议"))
+        blocks.append(
+            ReportBlock(
+                "body",
+                f"以下 {min(len(alternatives), 5)} 项可作为主方案后的备选清单，适合在正式志愿表里承担补位和风险对冲作用。",
+            )
+        )
+        blocks.append(_build_alternatives_table_block(alternatives[:5]))
         for item in alternatives[:5]:
             blocks.extend(_build_recommendation_blocks(item, include_bucket=True, condensed=True))
 
     if not_recommended:
-        blocks.append(ReportBlock("heading", "不建议优先报考"))
+        blocks.append(ReportBlock("heading", "不建议报考项"))
+        blocks.append(
+            ReportBlock(
+                "body",
+                "以下项目当前不建议直接纳入正式志愿表；若家庭仍想保留，必须先逐项完成人工复核和院校规则确认。",
+            )
+        )
+        blocks.append(_build_not_recommended_table_block(not_recommended[:5]))
         for item in not_recommended[:5]:
             blocks.append(ReportBlock("bullet", _build_not_recommended_text(item)))
 
@@ -168,47 +202,199 @@ def _build_recommendation_blocks(
     detail_parts: list[str] = []
     recommendation_reason = str(item.get("recommendationReason") or "").strip()
     risk_summary = str(item.get("riskSummary") or "").strip()
-    adjustment_advice = item.get("adjustmentAdvice") if isinstance(item.get("adjustmentAdvice"), dict) else None
     city_path_note = str(item.get("cityPathNote") or "").strip()
 
     if recommendation_reason:
         detail_parts.append(f"推荐理由：{recommendation_reason}")
     if risk_summary:
         detail_parts.append(f"风险摘要：{risk_summary}")
-    if adjustment_advice:
-        label = str(adjustment_advice.get("label") or "").strip()
-        detail = str(adjustment_advice.get("detail") or "").strip()
-        if label or detail:
-            detail_parts.append(f"调剂建议：{label}{'，' + detail if detail else ''}")
     if city_path_note and not condensed:
         detail_parts.append(f"城市路径：{city_path_note}")
 
     if detail_parts:
-        blocks.append(ReportBlock("body", "；".join(detail_parts)))
+        blocks.append(ReportBlock("body", "\n".join(detail_parts)))
+
+    risk_parts = _build_recommendation_risk_lines(item)
+    if risk_parts:
+        blocks.append(ReportBlock("body", "\n".join(risk_parts)))
 
     return blocks
 
 
-def _build_recommendation_table_block(items: list[dict[str, object]]) -> ReportBlock:
-    headers = ("院校 / 专业", "专业组", "城市", "最低分", "最低位次", "位次差", "风险")
-    rows: list[tuple[str, ...]] = []
-    for item in items:
-        rows.append(
+def _build_recommendation_risk_lines(item: dict[str, object]) -> list[str]:
+    return [
+        f"调剂风险：{_build_adjustment_risk_text(item)}",
+        f"选科限制：{_build_subject_requirement_text(item)}",
+        f"计划变化风险：{_build_plan_change_risk_text(item)}",
+        f"热门专业风险提示：{_build_hot_major_risk_text(item)}",
+    ]
+
+
+def _build_adjustment_risk_text(item: dict[str, object]) -> str:
+    adjustment_advice = item.get("adjustmentAdvice") if isinstance(item.get("adjustmentAdvice"), dict) else None
+    if not adjustment_advice:
+        return "正式填报前仍需逐校核对专业调剂与退档规则。"
+
+    label = str(adjustment_advice.get("label") or "").strip()
+    detail = str(adjustment_advice.get("detail") or "").strip()
+    if label and detail:
+        return f"{label}，{detail}"
+    return label or detail or "正式填报前仍需逐校核对专业调剂与退档规则。"
+
+
+def _build_subject_requirement_text(item: dict[str, object]) -> str:
+    subject_requirement = str(item.get("subjectRequirement") or "").strip()
+    subject_label = str(item.get("subjectLabel") or "").strip()
+    subject_status = str(item.get("subjectStatus") or "").strip().lower()
+
+    if subject_requirement and subject_label:
+        return f"{subject_label}，当前要求为 {subject_requirement}。"
+    if subject_requirement:
+        return f"当前要求为 {subject_requirement}，正式填报前需结合最新招生章程再次核对。"
+    if subject_label:
+        return f"{subject_label}，但仍建议和院校最新专业组要求逐项复核。"
+    if subject_status == "mismatch":
+        return "当前选科与目标专业组存在不匹配风险，不建议直接按该项正式报考。"
+    return "当前未提取到明确选科要求，正式填报前需逐校逐专业复核。"
+
+
+def _build_plan_change_risk_text(item: dict[str, object]) -> str:
+    plan_risk_label = str(item.get("planRiskLabel") or "").strip()
+    risk_summary = str(item.get("riskSummary") or "").strip()
+    plan_count = item.get("planCount")
+    group_code = str(item.get("planGroupCode") or item.get("batchCode") or "当前专业组").strip()
+
+    parts: list[str] = []
+    if plan_risk_label:
+        parts.append(plan_risk_label)
+    if plan_count not in (None, ""):
+        parts.append(f"{group_code} 当前参考计划人数 {plan_count}")
+    if risk_summary:
+        parts.append(risk_summary)
+    if not parts:
+        return "当年招生计划、专业组拆分和招生章程变化都可能影响最终结果，提交前需再核一次。"
+    return "；".join(parts)
+
+
+def _build_hot_major_risk_text(item: dict[str, object]) -> str:
+    major_name = str(item.get("majorName") or "").strip()
+    risk_level = str(item.get("riskLevel") or "").strip().lower()
+    probability_label = str(item.get("probabilityLabel") or "").strip()
+
+    if any(keyword in major_name for keyword in HOT_MAJOR_KEYWORDS):
+        hot_text = "该专业通常属于报考热度较高方向，同分段竞争和专业冷热变化可能放大实际门槛。"
+        if probability_label:
+            return f"{hot_text} 当前系统提示为“{probability_label}”，正式填报时需保守看待热度上浮。"
+        return f"{hot_text} 正式填报时需保守看待热度上浮。"
+    if risk_level in {"high", "review"}:
+        return "虽然当前未识别为典型热门专业，但若当年院校宣传、城市热度或专业组调整带来集中报考，门槛仍可能上浮。"
+    return "当前未识别到典型热门专业热度信号，但仍需关注当年专业冷热变化对最低位次的影响。"
+
+
+def _build_group_and_codes_text(item: dict[str, object]) -> str:
+    group_code = str(item.get("planGroupCode") or item.get("batchCode") or "-").strip() or "-"
+    code_parts: list[str] = []
+
+    institution_code = str(item.get("institutionCode") or "").strip()
+    major_code = str(item.get("majorCode") or "").strip()
+    if institution_code:
+        code_parts.append(f"院校{institution_code}")
+    if major_code:
+        code_parts.append(f"专业{major_code}")
+
+    if not code_parts:
+        return group_code
+    return f"{group_code} / {' '.join(code_parts)}"
+
+
+def _build_first_choice_table_block(item: dict[str, object]) -> ReportBlock:
+    headers = (
+        "院校 / 专业 / 城市",
+        "专业组 / 代码",
+        "最低分",
+        "最低位次",
+        "位次差",
+        "风险等级",
+        "推荐定位",
+    )
+    location_text = str(item.get("cityText") or item.get("city") or item.get("province") or "-")
+    reason_text = str(item.get("recommendationReason") or "当前适合作为第一志愿主力样本。").strip()
+    return ReportBlock(
+        "table",
+        table_headers=headers,
+        table_rows=(
             (
-                f"{item.get('institutionName') or '目标院校'} / {item.get('majorName') or '目标专业'}",
-                str(item.get("planGroupCode") or "-"),
-                str(item.get("cityText") or item.get("city") or item.get("province") or "-"),
+                f"{item.get('institutionName') or '目标院校'} / {item.get('majorName') or '目标专业'} / {location_text}",
+                _build_group_and_codes_text(item),
                 _format_number(item.get("minScore")) if item.get("minScore") not in (None, "") else "-",
                 _format_number(item.get("minRank")) if item.get("minRank") not in (None, "") else "-",
                 str(item.get("rankGap") or "-"),
                 str(item.get("riskLabel") or "-"),
+                reason_text,
+            ),
+        ),
+        table_column_widths=(140.0, 88.0, 42.0, 54.0, 48.0, 48.0, 95.28),
+    )
+
+
+def _build_alternatives_table_block(items: list[dict[str, object]]) -> ReportBlock:
+    headers = (
+        "院校 / 专业 / 城市",
+        "专业组 / 代码",
+        "风险等级",
+        "推荐理由",
+        "调剂建议",
+    )
+    rows: list[tuple[str, ...]] = []
+    for item in items:
+        location_text = str(item.get("cityText") or item.get("city") or item.get("province") or "-")
+        rows.append(
+            (
+                f"{item.get('institutionName') or '目标院校'} / {item.get('majorName') or '目标专业'} / {location_text}",
+                _build_group_and_codes_text(item),
+                str(item.get("riskLabel") or "-"),
+                str(item.get("recommendationReason") or item.get("riskSummary") or "待补充备选理由").strip(),
+                _build_adjustment_risk_text(item),
             )
         )
     return ReportBlock(
         "table",
         table_headers=headers,
         table_rows=tuple(rows),
-        table_column_widths=(158.0, 54.0, 50.0, 46.0, 60.0, 58.0, 63.28),
+        table_column_widths=(140.0, 88.0, 48.0, 105.0, 110.28),
+    )
+
+
+def _build_recommendation_table_block(items: list[dict[str, object]]) -> ReportBlock:
+    headers = (
+        "院校 / 专业 / 城市",
+        "专业组 / 代码",
+        "最低分",
+        "最低位次",
+        "位次差",
+        "风险等级",
+        "推荐理由",
+    )
+    rows: list[tuple[str, ...]] = []
+    for item in items:
+        location_text = str(item.get("cityText") or item.get("city") or item.get("province") or "-")
+        reason_text = str(item.get("recommendationReason") or item.get("riskSummary") or "待补充推荐理由").strip()
+        rows.append(
+            (
+                f"{item.get('institutionName') or '目标院校'} / {item.get('majorName') or '目标专业'} / {location_text}",
+                _build_group_and_codes_text(item),
+                _format_number(item.get("minScore")) if item.get("minScore") not in (None, "") else "-",
+                _format_number(item.get("minRank")) if item.get("minRank") not in (None, "") else "-",
+                str(item.get("rankGap") or "-"),
+                str(item.get("riskLabel") or "-"),
+                reason_text,
+            )
+        )
+    return ReportBlock(
+        "table",
+        table_headers=headers,
+        table_rows=tuple(rows),
+        table_column_widths=(140.0, 88.0, 42.0, 54.0, 48.0, 48.0, 95.28),
     )
 
 
@@ -218,8 +404,8 @@ def _build_recommendation_summary(item: dict[str, object], *, include_bucket: bo
 
     if include_bucket and item.get("bucket"):
         parts.append(f"档位：{_bucket_label(str(item.get('bucket') or ''))}")
-    if item.get("planGroupCode"):
-        parts.append(f"专业组：{item.get('planGroupCode')}")
+    if item.get("planGroupCode") or item.get("institutionCode") or item.get("majorCode"):
+        parts.append(f"专业组/代码：{_build_group_and_codes_text(item)}")
     if item.get("cityText") or item.get("city") or item.get("province"):
         parts.append(f"城市：{item.get('cityText') or item.get('city') or item.get('province')}")
     if item.get("minScore") not in (None, ""):
@@ -237,7 +423,49 @@ def _build_recommendation_summary(item: dict[str, object], *, include_bucket: bo
 def _build_not_recommended_text(item: dict[str, object]) -> str:
     title = f"{item.get('institutionName') or '目标院校'} - {item.get('majorName') or '目标专业'}"
     reason = str(item.get("reason") or item.get("riskSummary") or "建议暂不优先纳入正式志愿表。").strip()
+    notes = _build_not_recommended_notes_text(item)
+    if notes:
+        return f"{title}：{reason}；复核说明：{notes}"
     return f"{title}：{reason}"
+
+
+def _build_not_recommended_table_block(items: list[dict[str, object]]) -> ReportBlock:
+    headers = (
+        "院校 / 专业 / 城市",
+        "专业组 / 代码",
+        "最低分",
+        "最低位次",
+        "不建议原因",
+        "复核说明",
+    )
+    rows: list[tuple[str, ...]] = []
+    for item in items:
+        location_text = str(item.get("cityText") or item.get("city") or item.get("province") or "-")
+        rows.append(
+            (
+                f"{item.get('institutionName') or '目标院校'} / {item.get('majorName') or '目标专业'} / {location_text}",
+                _build_group_and_codes_text(item),
+                _format_number(item.get("minScore")) if item.get("minScore") not in (None, "") else "-",
+                _format_number(item.get("minRank")) if item.get("minRank") not in (None, "") else "-",
+                str(item.get("reason") or item.get("riskSummary") or "建议暂不优先纳入正式志愿表。").strip(),
+                _build_not_recommended_notes_text(item),
+            )
+        )
+    return ReportBlock(
+        "table",
+        table_headers=headers,
+        table_rows=tuple(rows),
+        table_column_widths=(132.0, 82.0, 42.0, 54.0, 100.0, 81.28),
+    )
+
+
+def _build_not_recommended_notes_text(item: dict[str, object]) -> str:
+    notes = item.get("notes")
+    if isinstance(notes, list):
+        normalized = [str(note).strip() for note in notes if str(note).strip()]
+        if normalized:
+            return "；".join(normalized[:3])
+    return "如需保留该项，需重新核对位次、选科要求、调剂与院校当年章程。"
 
 
 def _bucket_label(bucket: str) -> str:
@@ -259,19 +487,19 @@ def _format_number(value: object) -> str:
 
 
 def _build_docx_document_xml(blocks: list[ReportBlock]) -> str:
-    paragraphs: list[str] = []
+    elements: list[str] = []
     for block in blocks:
         if block.table_rows:
-            paragraphs.extend(_build_docx_table_paragraphs(block))
+            elements.append(_build_docx_table_xml(block))
             continue
         style_id = _docx_style_id(block.style)
         for line in _split_block_lines(block.text):
             if not line:
-                paragraphs.append(_docx_paragraph_xml("", style_id="Normal"))
+                elements.append(_docx_paragraph_xml("", style_id="Normal"))
                 continue
-            paragraphs.append(_docx_paragraph_xml(line, style_id=style_id))
+            elements.append(_docx_paragraph_xml(line, style_id=style_id))
 
-    body = "".join(paragraphs)
+    body = "".join(elements)
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<w:document '
@@ -285,13 +513,72 @@ def _build_docx_document_xml(blocks: list[ReportBlock]) -> str:
     )
 
 
-def _build_docx_table_paragraphs(block: ReportBlock) -> list[str]:
-    paragraphs: list[str] = []
-    header_line = " | ".join(block.table_headers)
-    paragraphs.append(_docx_paragraph_xml(header_line, style_id="Subtitle"))
-    for row in block.table_rows:
-        paragraphs.append(_docx_paragraph_xml(" | ".join(row), style_id="Normal"))
-    return paragraphs
+def _build_docx_table_xml(block: ReportBlock) -> str:
+    headers = list(block.table_headers)
+    rows = [list(row) for row in block.table_rows]
+    widths = list(block.table_column_widths) if block.table_column_widths else []
+    if headers and not widths:
+        widths = [7200 / len(headers)] * len(headers)
+
+    header_xml = _docx_table_row_xml(headers, widths=widths, is_header=True)
+    row_xml = "".join(_docx_table_row_xml(row, widths=widths, is_header=False) for row in rows)
+    grid_cols = "".join(
+        f'<w:gridCol w:w="{_docx_width_value(width)}"/>'
+        for width in widths
+    )
+
+    return (
+        "<w:tbl>"
+        "<w:tblPr>"
+        '<w:tblStyle w:val="TableGrid"/>'
+        '<w:tblW w:w="0" w:type="auto"/>'
+        '<w:tblLayout w:type="fixed"/>'
+        "<w:tblBorders>"
+        '<w:top w:val="single" w:sz="8" w:space="0" w:color="C9D7F0"/>'
+        '<w:left w:val="single" w:sz="8" w:space="0" w:color="C9D7F0"/>'
+        '<w:bottom w:val="single" w:sz="8" w:space="0" w:color="C9D7F0"/>'
+        '<w:right w:val="single" w:sz="8" w:space="0" w:color="C9D7F0"/>'
+        '<w:insideH w:val="single" w:sz="6" w:space="0" w:color="D9E3F3"/>'
+        '<w:insideV w:val="single" w:sz="6" w:space="0" w:color="D9E3F3"/>'
+        "</w:tblBorders>"
+        '<w:tblCellMar><w:top w:w="70" w:type="dxa"/><w:left w:w="90" w:type="dxa"/><w:bottom w:w="70" w:type="dxa"/><w:right w:w="90" w:type="dxa"/></w:tblCellMar>'
+        "</w:tblPr>"
+        f"<w:tblGrid>{grid_cols}</w:tblGrid>"
+        f"{header_xml}{row_xml}"
+        "</w:tbl>"
+    )
+
+
+def _docx_table_row_xml(cells: list[str], *, widths: list[float], is_header: bool) -> str:
+    row_cells = []
+    for index, cell in enumerate(cells):
+        width = widths[index] if index < len(widths) else 1200
+        row_cells.append(_docx_table_cell_xml(str(cell or "-"), width=width, is_header=is_header))
+    return f"<w:tr>{''.join(row_cells)}</w:tr>"
+
+
+def _docx_table_cell_xml(text: str, *, width: float, is_header: bool) -> str:
+    safe_text = escape(text)
+    width_value = _docx_width_value(width)
+    shading = '<w:shd w:val="clear" w:color="auto" w:fill="E8F0FE"/>' if is_header else ""
+    bold = "<w:b/>" if is_header else ""
+    color = "1D4ED8" if is_header else "1F2937"
+    return (
+        "<w:tc>"
+        f'<w:tcPr><w:tcW w:w="{width_value}" w:type="dxa"/>{shading}</w:tcPr>'
+        "<w:p>"
+        '<w:pPr><w:spacing w:after="60" w:line="300" w:lineRule="auto"/></w:pPr>'
+        "<w:r>"
+        f'<w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="微软雅黑"/>{bold}<w:color w:val="{color}"/><w:sz w:val="20"/></w:rPr>'
+        f'<w:t xml:space="preserve">{safe_text}</w:t>'
+        "</w:r>"
+        "</w:p>"
+        "</w:tc>"
+    )
+
+
+def _docx_width_value(width: float) -> int:
+    return max(720, int(round(width * 20)))
 
 
 def _docx_paragraph_xml(text: str, *, style_id: str) -> str:

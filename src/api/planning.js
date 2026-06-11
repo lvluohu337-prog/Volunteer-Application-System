@@ -1,4 +1,4 @@
-import { apiRequest } from "./client.js";
+import { apiRequest, downloadRequest } from "./client.js";
 import {
   API_ENDPOINTS,
   createPath,
@@ -365,6 +365,16 @@ export async function exportReportWord(studentId, params = {}) {
     method: API_ENDPOINTS.reports.exportWord.method,
     body: mapReportExportBody(params)
   });
+}
+
+export async function downloadReportDelivery(studentId, recordId, artifactName = "") {
+  return downloadRequest(
+    createPath(API_ENDPOINTS.reports.deliveryDownload.path, { studentId, recordId }),
+    {
+      method: API_ENDPOINTS.reports.deliveryDownload.method,
+      filename: artifactName || undefined
+    }
+  );
 }
 
 export async function fetchFoundationMajors(params = {}) {

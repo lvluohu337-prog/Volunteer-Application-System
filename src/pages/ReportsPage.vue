@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   createReportAdvisorNote,
+  downloadReportDelivery,
   exportReportPdf,
   exportReportWord,
   fetchReportData
@@ -107,6 +108,7 @@ const generationRecords = ref([]);
 const deliveryRecords = ref([]);
 const savingNote = ref(false);
 const exporting = ref("");
+const downloadingRecordId = ref(null);
 const noteForm = ref({
   author_name: "张老师",
   note_title: "",
@@ -300,6 +302,20 @@ function adjustmentTagType(preference) {
   }[String(preference || "")] || "info";
 }
 
+function formatFileSize(value) {
+  const size = Number(value);
+  if (!Number.isFinite(size) || size <= 0) {
+    return "待补充";
+  }
+  if (size < 1024) {
+    return `${size} B`;
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 async function loadPageData() {
   loading.value = true;
   const data = await fetchReportData(parseStudentId(), parseProductCode());
@@ -395,13 +411,48 @@ async function runExport(format) {
       format === "pdf"
         ? await exportReportPdf(studentId.value, params)
         : await exportReportWord(studentId.value, params);
+    if (result.deliveryRecord?.id) {
+      await handleDeliveryDownload(
+        {
+          id: result.deliveryRecord.id,
+          artifact_name: result.artifactName,
+          export_format: result.exportFormat,
+        },
+        { silentSuccess: true }
+      );
+    }
     await loadPageData();
     emit(
       "open-dialog",
-      `${format.toUpperCase()} 正式交付文件已生成：${result.downloadUrl}\n系统已经同步写入导出留痕，可直接用于归档、发送和讲解交付。`
+      `${format.toUpperCase()} 正式交付文件已生成并开始下载：${result.artifactName}\n系统已经同步写入导出留痕，可直接用于归档、发送和讲解交付。`
     );
   } finally {
     exporting.value = "";
+  }
+}
+
+async function handleDeliveryDownload(record, options = {}) {
+  if (!studentId.value || !record?.id) {
+    emit("open-dialog", "当前导出记录缺少可用下载标识，请先重新导出一次正式文件。");
+    return;
+  }
+
+  downloadingRecordId.value = record.id;
+  try {
+    await downloadReportDelivery(studentId.value, record.id, record.artifact_name || "");
+    if (!options.silentSuccess) {
+      emit(
+        "open-dialog",
+        `${(record.export_format || "文件").toUpperCase()} 下载已开始：${record.artifact_name || "正式交付文件"}`
+      );
+    }
+  } catch (error) {
+    emit(
+      "open-dialog",
+      `当前下载未成功，可能是文件已失效或已被移动：${record.artifact_name || "正式交付文件"}`
+    );
+  } finally {
+    downloadingRecordId.value = null;
   }
 }
 
@@ -1015,7 +1066,7 @@ watch(
               <article class="traceability-card">
                 <header class="traceability-head">
                   <strong>导出与交付记录</strong>
-                  <span>记录 PDF / Word 正式交付文件的生成时间、操作人与文件位置。</span>
+                  <span>优先提供可直接访问的下载入口，并保留生成时间、操作人与文件留痕信息。</span>
                 </header>
                 <div v-if="deliveryRecords.length" class="trace-list">
                   <article
@@ -1023,10 +1074,30 @@ watch(
                     :key="record.id"
                     class="trace-item"
                   >
-                    <strong>{{ record.export_format?.toUpperCase() }} / {{ record.report_title || reportTitle }}</strong>
+                    <div class="trace-item-head">
+                      <strong>{{ record.export_format?.toUpperCase() }} / {{ record.report_title || reportTitle }}</strong>
+                      <el-tag :type="record.artifactExists ? 'success' : 'danger'">
+                        {{ record.artifactExists ? "文件可下载" : "文件缺失" }}
+                      </el-tag>
+                    </div>
                     <span>{{ record.created_at }} / {{ record.generated_by || "system-export" }}</span>
                     <p>{{ record.artifact_name }}</p>
-                    <p class="table-note">{{ record.artifact_path }}</p>
+                    <div class="trace-download-row">
+                      <el-button
+                        type="primary"
+                        plain
+                        size="small"
+                        :disabled="!record.artifactExists"
+                        :loading="downloadingRecordId === record.id"
+                        @click="handleDeliveryDownload(record)"
+                      >
+                        下载 {{ record.export_format?.toUpperCase() || "文件" }}
+                      </el-button>
+                      <span class="table-note">
+                        {{ record.artifactSizeBytes ? formatFileSize(record.artifactSizeBytes) : "待补充文件大小" }}
+                      </span>
+                    </div>
+                    <p class="table-note">留痕路径：{{ record.artifactPathLabel || record.artifact_path }}</p>
                   </article>
                 </div>
                 <p v-else class="table-note">当前还没有导出记录，正式导出后会自动留痕。</p>
@@ -1090,6 +1161,20 @@ watch(
   background: rgba(15, 23, 42, 0.05);
   color: var(--app-text-secondary);
   font-size: 13px;
+}
+
+.trace-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trace-download-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .product-head {

@@ -116,6 +116,11 @@ export const API_ENDPOINTS = {
       method: "POST",
       path: "/reports/student/:studentId/export/word",
       summary: "Export Word report"
+    },
+    deliveryDownload: {
+      method: "GET",
+      path: "/reports/student/:studentId/deliveries/:recordId/download",
+      summary: "Download exported report artifact"
     }
   },
   foundation: {

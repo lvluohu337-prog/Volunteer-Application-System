@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from fastapi import HTTPException
+
 from backend.admissions_engine import (
     build_admissions_context,
     build_plan_columns_from_candidates,
@@ -679,9 +681,7 @@ def _create_report_delivery_record(
             [record_id],
         ).fetchone()
 
-    item = dict(row)
-    item["payload"] = payload_summary
-    return item
+    return _serialize_delivery_record(dict(row), payload_summary=payload_summary)
 
 
 def _fallback_section_titles_for_module(module_name: str) -> list[str]:
@@ -961,13 +961,112 @@ def _list_report_delivery_records(student_id: int, product_code: str, limit: int
 
     records: list[dict[str, Any]] = []
     for row in rows:
-        item = dict(row)
+        records.append(_serialize_delivery_record(dict(row)))
+    return records
+
+
+def _build_report_delivery_download_url(student_id: int, record_id: int | None) -> str:
+    return f"/api/reports/student/{student_id}/deliveries/{record_id}/download"
+
+
+def _serialize_delivery_record(
+    item: dict[str, Any],
+    *,
+    payload_summary: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if payload_summary is not None:
+        item["payload"] = payload_summary
+    else:
         try:
             item["payload"] = json.loads(item.get("payload_json") or "{}")
         except json.JSONDecodeError:
             item["payload"] = {}
-        records.append(item)
-    return records
+
+    artifact_path_text = str(item.get("artifact_path") or "").strip()
+    item["downloadUrl"] = _build_report_delivery_download_url(
+        safe_int(item.get("student_id")) or safe_int(item.get("studentId")) or 0,
+        safe_int(item.get("id")) or None,
+    )
+    item["artifactExists"] = False
+    item["artifactPathLabel"] = artifact_path_text
+    item["artifactSizeBytes"] = None
+
+    if not artifact_path_text:
+        return item
+
+    artifact_path = Path(artifact_path_text)
+    export_dir = _report_exports_dir().resolve()
+    try:
+        resolved_path = artifact_path.resolve()
+    except OSError:
+        return item
+
+    try:
+        relative_path = resolved_path.relative_to(export_dir)
+        item["artifactPathLabel"] = str(relative_path)
+    except ValueError:
+        item["artifactPathLabel"] = str(resolved_path)
+
+    if resolved_path.exists() and resolved_path.is_file():
+        item["artifactExists"] = True
+        try:
+            item["artifactSizeBytes"] = resolved_path.stat().st_size
+        except OSError:
+            item["artifactSizeBytes"] = None
+
+    return item
+
+
+def get_report_delivery_download(student_id: int, record_id: int) -> dict[str, Any]:
+    with db_session() as connection:
+        row = connection.execute(
+            """
+            SELECT id, student_id, product_code, export_format, report_title, artifact_name, artifact_path,
+                   delivery_status, generated_by, include_signature, payload_json, created_at
+            FROM report_delivery_records
+            WHERE id = ? AND student_id = ?
+            """,
+            [record_id, student_id],
+        ).fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Report delivery record not found")
+
+    record = _serialize_delivery_record(dict(row))
+    artifact_path_text = str(record.get("artifact_path") or "").strip()
+    if not artifact_path_text:
+        raise HTTPException(status_code=404, detail="Export artifact path is missing")
+
+    artifact_path = Path(artifact_path_text)
+    try:
+        resolved_path = artifact_path.resolve()
+        export_dir = _report_exports_dir().resolve()
+    except OSError as exc:
+        raise HTTPException(status_code=404, detail="Export artifact is unavailable") from exc
+
+    try:
+        resolved_path.relative_to(export_dir)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Export artifact is unavailable") from exc
+
+    if not resolved_path.exists() or not resolved_path.is_file():
+        raise HTTPException(status_code=404, detail="Export artifact file not found")
+
+    export_format = str(record.get("export_format") or "").lower()
+    media_type = (
+        "application/pdf"
+        if export_format == "pdf"
+        else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+
+    return {
+        "recordId": record_id,
+        "studentId": student_id,
+        "artifactPath": resolved_path,
+        "artifactName": str(record.get("artifact_name") or resolved_path.name),
+        "mediaType": media_type,
+        "downloadUrl": record["downloadUrl"],
+    }
 
 
 def _build_report_record_summary(
@@ -1135,7 +1234,7 @@ def export_report_package(student_id: int, payload: Any, export_format: str) -> 
         "productCode": product_code,
         "exportFormat": export_format,
         "artifactType": payload_summary["artifactType"],
-        "downloadUrl": str(artifact_path),
+        "downloadUrl": _build_report_delivery_download_url(student_id, safe_int(delivery_record.get("id")) or None),
         "artifactName": artifact_name,
         "deliveryRecord": delivery_record,
     }
