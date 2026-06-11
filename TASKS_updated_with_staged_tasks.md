@@ -107,13 +107,13 @@
 - [x] 补齐 `institution_rules`
 - [x] 补齐 `admission_risk_rules`
 - [x] 补齐 `policy_trends`
-- [ ] 验证 `backend/planning_repository.py` 的报告链路已能稳定命中真实候选，而不是 fallback 分支
+- [x] 验证 `backend/planning_repository.py` 的报告链路已能稳定命中真实候选，而不是 fallback 分支
 
 #### 结果可信度标识
 
-- [ ] 在后端响应中增加“真实招生结果 / fallback 结果”标记
-- [ ] `src/pages/AnalysisPage.vue` 明确展示当前结果来源
-- [ ] `src/pages/MajorsPage.vue` 明确展示当前结果来源
+- [x] 在后端响应中增加“真实招生结果 / fallback 结果”标记
+- [x] `src/pages/AnalysisPage.vue` 明确展示当前结果来源
+- [x] `src/pages/MajorsPage.vue` 明确展示当前结果来源
 - [ ] `src/pages/PlanPage.vue` 明确展示当前结果来源
 - [ ] `src/pages/ReportsPage.vue` 明确展示当前结果来源
 - [ ] 当未命中真实招生数据时，统一显示醒目的风险提示和后续操作建议

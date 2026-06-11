@@ -33,6 +33,17 @@ const hasStudent = ref(false);
 const studentId = ref(null);
 const rows = ref([]);
 const disclaimer = ref("");
+const resultSource = ref({
+  mode: "empty",
+  label: "未生成结果",
+  isRealData: false,
+  matchedCandidateCount: 0,
+  candidateStrategy: null,
+  rankSource: null,
+  latestAdmissionYear: null,
+  fallbackReason: "",
+  notice: ""
+});
 const derivedProfile = ref({ ...emptyDerivedProfile });
 const portraitRecommendation = ref({ ...emptyPortraitRecommendation });
 const ruleSummary = ref({
@@ -46,6 +57,50 @@ const primaryReason = computed(() => portraitRecommendation.value.majorFitReason
 const preferredDirection = computed(
   () => ruleSummary.value.preferredDirection || portraitRecommendation.value.preferredDirection || "待补充画像信息"
 );
+
+const resultSourceMeta = computed(() => {
+  const mode = resultSource.value.mode;
+  if (mode === "real") {
+    return {
+      title: "当前结果已命中真实招生数据",
+      tagLabel: resultSource.value.label || "真实招生结果",
+      tagVariant: "success"
+    };
+  }
+  if (mode === "real_relaxed") {
+    return {
+      title: "当前结果来自真实招生数据，但已放宽位次硬门槛",
+      tagLabel: resultSource.value.label || "真实招生结果（放宽位次）",
+      tagVariant: "review"
+    };
+  }
+  if (mode === "fallback") {
+    return {
+      title: "当前结果未命中真实招生候选，已切回画像/规则兜底",
+      tagLabel: resultSource.value.label || "画像/规则兜底结果",
+      tagVariant: "warning"
+    };
+  }
+  return {
+    title: "当前尚未生成可用专业推荐结果",
+    tagLabel: resultSource.value.label || "未生成结果",
+    tagVariant: "default"
+  };
+});
+
+const resultSourceFacts = computed(() => {
+  const items = [];
+  if (resultSource.value.matchedCandidateCount) {
+    items.push(`真实候选 ${resultSource.value.matchedCandidateCount} 条`);
+  }
+  if (resultSource.value.latestAdmissionYear) {
+    items.push(`主要参考年份 ${resultSource.value.latestAdmissionYear}`);
+  }
+  if (resultSource.value.rankSource) {
+    items.push(`位次来源 ${resultSource.value.rankSource}`);
+  }
+  return items;
+});
 
 function parseStudentId() {
   const rawValue = route.query.studentId;
@@ -63,6 +118,7 @@ async function loadPageData() {
   studentId.value = data.studentId ?? null;
   rows.value = data.rows ?? [];
   disclaimer.value = data.disclaimer ?? "";
+  resultSource.value = data.resultSource ?? resultSource.value;
   ruleSummary.value = data.ruleSummary ?? ruleSummary.value;
   derivedProfile.value = data.derivedProfile ?? { ...emptyDerivedProfile };
   portraitRecommendation.value = data.portraitRecommendation ?? { ...emptyPortraitRecommendation };
@@ -115,6 +171,32 @@ onMounted(() => {
 
     <el-skeleton :loading="loading" animated :rows="10">
       <template #default>
+        <el-card v-if="hasStudent" shadow="never" class="panel-card result-source-banner">
+          <div class="result-source-head">
+            <div>
+              <h3>{{ resultSourceMeta.title }}</h3>
+              <p>
+                {{
+                  resultSource.notice ||
+                  resultSource.fallbackReason ||
+                  "正式填报前仍需结合官方位次、院校章程和招生计划复核。"
+                }}
+              </p>
+            </div>
+            <StatusTag :label="resultSourceMeta.tagLabel" :variant="resultSourceMeta.tagVariant" />
+          </div>
+
+          <div v-if="resultSourceFacts.length" class="result-source-facts">
+            <span
+              v-for="item in resultSourceFacts"
+              :key="item"
+              class="result-source-fact"
+            >
+              {{ item }}
+            </span>
+          </div>
+        </el-card>
+
         <div v-if="hasStudent" class="summary-grid">
           <el-card shadow="never" class="panel-card summary-card">
             <h3>优先推荐方向</h3>
@@ -296,6 +378,50 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.result-source-banner {
+  gap: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 32%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.88));
+}
+
+.result-source-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.result-source-head h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--app-text-primary);
+}
+
+.result-source-head p {
+  margin: 0;
+  color: var(--app-text-secondary);
+  line-height: 1.7;
+}
+
+.result-source-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.result-source-fact {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--app-text-secondary);
+  font-size: 13px;
+}
+
 .portrait-grid,
 .reason-grid,
 .portrait-columns,
@@ -394,6 +520,7 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .result-source-head,
   .card-head,
   .major-head,
   .major-footer {

@@ -841,6 +841,7 @@ def _build_formal_report_json(
     delivery_records: list[dict[str, Any]] | None = None,
     portrait_recommendation: dict[str, Any] | None = None,
     structured_recommendations: dict[str, Any] | None = None,
+    result_source: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     normalized_code = _normalize_report_product_code(product_code)
     product_config = REPORT_PRODUCT_CONFIG[normalized_code]
@@ -882,6 +883,7 @@ def _build_formal_report_json(
             "developmentGoals": derived_profile.get("developmentGoals") or [],
         },
         "portraitRecommendation": portrait_recommendation or {},
+        "resultSource": result_source or {},
         "recommendationTable": structured_recommendations.get("recommendationTable") or [],
         "firstChoice": structured_recommendations.get("firstChoice"),
         "alternatives": structured_recommendations.get("alternatives") or [],
@@ -1460,6 +1462,58 @@ def _real_context_notice(context: dict[str, Any]) -> str | None:
     if context.get("candidate_strategy") == "score_relaxed_real_data":
         return "当前候选仍来自真实招生表，但由于本届分数/位次口径与已入库历史年份不完全同口径，系统已临时放宽位次硬门槛，优先按真实分数线与真实招生记录筛选。"
     return None
+
+
+def _fallback_reason_text(student: dict[str, Any], context: dict[str, Any]) -> str:
+    if not student.get("province"):
+        return "缺少省份信息，当前无法命中真实招生数据。"
+    if safe_number(context.get("score")) <= 0:
+        return "缺少有效分数，当前无法命中真实招生数据。"
+    if not context.get("track_labels"):
+        return "当前选科/科类信息无法映射到已入库真实招生轨道。"
+    if not context.get("latest_year"):
+        return "当前省份或选科轨道尚未补齐可用于推荐的真实历史招生数据。"
+    return "当前分数、位次、选科或批次条件未命中已入库真实招生候选，系统已退回画像/规则结果。"
+
+
+def _build_result_source(
+    student: dict[str, Any],
+    admissions_bundle: dict[str, Any] | None,
+    *,
+    used_real_candidates: bool,
+) -> dict[str, Any]:
+    bundle = admissions_bundle or {}
+    context = bundle.get("context") or build_admissions_context(student)
+    candidate_count = len(bundle.get("candidates") or [])
+    candidate_strategy = context.get("candidate_strategy") or None
+    notice = _real_context_notice(context)
+
+    if used_real_candidates and candidate_count > 0:
+        mode = "real_relaxed" if candidate_strategy == "score_relaxed_real_data" else "real"
+        label = "真实招生结果（放宽位次）" if mode == "real_relaxed" else "真实招生结果"
+        return {
+            "mode": mode,
+            "label": label,
+            "isRealData": True,
+            "matchedCandidateCount": candidate_count,
+            "candidateStrategy": candidate_strategy,
+            "rankSource": context.get("rank_source"),
+            "latestAdmissionYear": context.get("latest_year"),
+            "fallbackReason": None,
+            "notice": notice,
+        }
+
+    return {
+        "mode": "fallback",
+        "label": "画像/规则兜底结果",
+        "isRealData": False,
+        "matchedCandidateCount": candidate_count,
+        "candidateStrategy": candidate_strategy,
+        "rankSource": context.get("rank_source"),
+        "latestAdmissionYear": context.get("latest_year"),
+        "fallbackReason": _fallback_reason_text(student, context),
+        "notice": notice,
+    }
 
 
 def _build_real_major_cards(bundle: dict[str, Any]) -> list[dict[str, Any]]:
@@ -2493,6 +2547,7 @@ def get_student_analysis(student_id: int) -> dict[str, Any]:
         score_profile = evaluate_score_profile(student)
         tag = _status_tag(student)
         context = admissions_bundle["context"]
+        result_source = _build_result_source(student, admissions_bundle, used_real_candidates=True)
 
         warnings = [
             *score_profile["risk_items"],
@@ -2540,6 +2595,7 @@ def get_student_analysis(student_id: int) -> dict[str, Any]:
             "derivedProfile": _build_derived_profile_summary(student),
             "portraitRecommendation": portrait_recommendation,
             "policyHighlights": policy_highlights,
+            "resultSource": result_source,
         }
 
     major_results = _major_rule_results(student)
@@ -2553,6 +2609,7 @@ def get_student_analysis(student_id: int) -> dict[str, Any]:
         "若院校专业组、选科要求或调剂规则发生变化，方案需要同步调整。",
         COMPLIANCE_DISCLAIMER,
     ]
+    result_source = _build_result_source(student, admissions_bundle, used_real_candidates=False)
 
     return {
         "hasStudent": True,
@@ -2619,6 +2676,7 @@ def get_student_analysis(student_id: int) -> dict[str, Any]:
         "ruleSummary": _apply_portrait_summary(_build_rule_summary(student, major_results, strategy), portrait_recommendation),
         "derivedProfile": _build_derived_profile_summary(student),
         "portraitRecommendation": portrait_recommendation,
+        "resultSource": result_source,
     }
 
 
@@ -2637,6 +2695,7 @@ def get_student_majors(student_id: int) -> dict[str, Any]:
             "portraitRecommendation": portrait_recommendation,
             "derivedProfile": _build_derived_profile_summary(student),
             "disclaimer": COMPLIANCE_DISCLAIMER,
+            "resultSource": _build_result_source(student, admissions_bundle, used_real_candidates=True),
         }
 
     major_results = _major_rule_results(student)
@@ -2651,6 +2710,7 @@ def get_student_majors(student_id: int) -> dict[str, Any]:
         "portraitRecommendation": portrait_recommendation,
         "derivedProfile": _build_derived_profile_summary(student),
         "disclaimer": COMPLIANCE_DISCLAIMER,
+        "resultSource": _build_result_source(student, admissions_bundle, used_real_candidates=False),
     }
 
 
@@ -2673,6 +2733,7 @@ def get_student_plan(student_id: int) -> dict[str, Any]:
             "notRecommended": structured_recommendations["notRecommended"],
             "portraitRecommendation": portrait_recommendation,
             "disclaimer": COMPLIANCE_DISCLAIMER,
+            "resultSource": _build_result_source(student, admissions_bundle, used_real_candidates=True),
         }
 
     major_results = _major_rule_results(student)
@@ -2685,6 +2746,7 @@ def get_student_plan(student_id: int) -> dict[str, Any]:
         "ruleSummary": _apply_portrait_summary(_build_rule_summary(student, major_results, strategy), portrait_recommendation),
         "portraitRecommendation": portrait_recommendation,
         "disclaimer": COMPLIANCE_DISCLAIMER,
+        "resultSource": _build_result_source(student, admissions_bundle, used_real_candidates=False),
     }
 
 
@@ -2704,6 +2766,7 @@ def get_student_report(
         major_cards = _build_real_major_cards(admissions_bundle)
         structured_recommendations = _build_structured_recommendations(student, admissions_bundle)
         policy_highlights = _fetch_policy_highlights(student, admissions_bundle, limit=3)
+        result_source = _build_result_source(student, admissions_bundle, used_real_candidates=True)
         sections = _inject_policy_section(
             _build_real_report_sections(student, admissions_bundle, strategy, major_cards, policy_highlights, portrait_recommendation),
             policy_highlights,
@@ -2764,6 +2827,7 @@ def get_student_report(
             "advisorNotes": advisor_notes,
             "generationRecords": generation_records,
             "deliveryRecords": delivery_records,
+            "resultSource": result_source,
             "reportJson": _build_formal_report_json(
                 student=student,
                 product_code=selected_product_code,
@@ -2777,6 +2841,7 @@ def get_student_report(
                 delivery_records=delivery_records,
                 portrait_recommendation=portrait_recommendation,
                 structured_recommendations=structured_recommendations,
+                result_source=result_source,
             ),
             "disclaimer": COMPLIANCE_DISCLAIMER,
             "boundaryNote": INTERFACE_BOUNDARY_NOTE,
@@ -2790,6 +2855,7 @@ def get_student_report(
     matched_cities = [item["row"].get("city_name") or "目标城市" for item in city_results[:4]]
     rule_summary = _apply_portrait_summary(_build_rule_summary(student, major_results, strategy), portrait_recommendation)
     derived_profile = _build_derived_profile_summary(student)
+    result_source = _build_result_source(student, admissions_bundle, used_real_candidates=False)
     report_title = f"{student.get('name') or '学生'} 志愿规划报告预览"
     _create_report_generation_record(
         student_id=student_id,
@@ -2837,6 +2903,7 @@ def get_student_report(
         "advisorNotes": advisor_notes,
         "generationRecords": generation_records,
         "deliveryRecords": delivery_records,
+        "resultSource": result_source,
         "reportJson": _build_formal_report_json(
             student=student,
             product_code=selected_product_code,
@@ -2849,6 +2916,7 @@ def get_student_report(
             delivery_records=delivery_records,
             portrait_recommendation=portrait_recommendation,
             structured_recommendations=None,
+            result_source=result_source,
         ),
         "disclaimer": COMPLIANCE_DISCLAIMER,
         "boundaryNote": INTERFACE_BOUNDARY_NOTE,

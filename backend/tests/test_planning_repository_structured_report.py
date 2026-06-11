@@ -67,12 +67,15 @@ class PlanningRepositoryStructuredReportTest(unittest.TestCase):
             matched_cities=["郑州"],
             portrait_recommendation={"preferredDirection": "工科"},
             structured_recommendations=structured_recommendations,
+            result_source={"mode": "real", "label": "真实招生结果", "isRealData": True},
         )
 
         self.assertIn("recommendationTable", report_json)
         self.assertIn("firstChoice", report_json)
         self.assertIn("alternatives", report_json)
         self.assertIn("notRecommended", report_json)
+        self.assertIn("resultSource", report_json)
+        self.assertTrue(report_json["resultSource"]["isRealData"])
         self.assertEqual(report_json["firstChoice"]["institutionName"], "郑州大学")
         self.assertEqual(report_json["recommendationTable"][0]["majorName"], "自动化类")
 

@@ -161,6 +161,18 @@ const emptyStudentDrivenState = Object.freeze({
   studentId: null
 });
 
+const emptyResultSource = Object.freeze({
+  mode: "empty",
+  label: "未生成结果",
+  isRealData: false,
+  matchedCandidateCount: 0,
+  candidateStrategy: null,
+  rankSource: null,
+  latestAdmissionYear: null,
+  fallbackReason: "",
+  notice: ""
+});
+
 async function resolveStudentId(studentId) {
   if (studentId !== undefined && studentId !== null && studentId !== "") {
     return Number(studentId);
@@ -258,6 +270,10 @@ export async function fetchAnalysisData(studentId) {
       metrics: [],
       buckets: [],
       subjectBars: [],
+      resultSource: {
+        ...emptyResultSource,
+        fallbackReason: "请先创建真实学生档案，并补充分数与位次信息。"
+      },
       warnings: ["请先创建真实学生档案，并补充分数与位次信息。"]
     };
   }
