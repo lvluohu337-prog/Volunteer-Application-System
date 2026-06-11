@@ -11,8 +11,8 @@ from backend.foundation_constants import (
     COMPLIANCE_DISCLAIMER,
     ELEMENT_RULES,
     INTERFACE_BOUNDARY_NOTE,
-    REPORT_PRODUCT_LABELS,
 )
+from backend.report_products import REPORT_PRODUCT_LABELS
 from backend.repository import now_text, normalize_text
 
 

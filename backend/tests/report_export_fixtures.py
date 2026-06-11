@@ -6,7 +6,7 @@ from copy import deepcopy
 _MINIMAL_REPORT_DATA = {
     "reportTitle": "胡祥荟 志愿规划报告",
     "reportSubtitle": "河南 2026 届高考考生 / 399 报告预览",
-    "activeProductLabel": "399 咨询版",
+    "activeProductLabel": "399 元标准版报告",
     "recommendationTable": [
         {
             "bucket": "steady",

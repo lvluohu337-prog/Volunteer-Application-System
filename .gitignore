@@ -16,3 +16,4 @@ data_assets/
 *.pdf
 *.docx
 *.zip
+backend/backups/

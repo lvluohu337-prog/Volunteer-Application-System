@@ -25,7 +25,7 @@ const coreActions = computed(() => [
   },
   {
     title: "生成正式报告",
-    description: "进入报告中心，选择 99 / 399 / 699 / 999 版本并查看交付内容。",
+    description: "进入报告中心，选择当前正式支持的 99 / 399 / 999 版本并查看交付内容。",
     target: "reports"
   }
 ]);

@@ -12,6 +12,12 @@ import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
 import StatusTag from "../components/StatusTag.vue";
 import { COMPLIANCE_DISCLAIMER } from "../constants/compliance.js";
+import {
+  DEFAULT_REPORT_PRODUCT_CODE,
+  getReportProductLabel,
+  normalizeReportProductCode,
+  PLANNED_REPORT_PRODUCTS
+} from "../constants/reportProducts.js";
 
 const emit = defineEmits(["open-dialog"]);
 const route = useRoute();
@@ -71,8 +77,8 @@ const bucketDefinitions = [
 const loading = ref(true);
 const hasStudent = ref(false);
 const studentId = ref(null);
-const activeProductCode = ref("399");
-const activeProductLabel = ref("399 元进阶版报告");
+const activeProductCode = ref(DEFAULT_REPORT_PRODUCT_CODE);
+const activeProductLabel = ref(getReportProductLabel(DEFAULT_REPORT_PRODUCT_CODE));
 const reportProducts = ref([]);
 const outline = ref([]);
 const sections = ref([]);
@@ -137,6 +143,22 @@ const fourPillars = computed(() =>
 const activeProduct = computed(
   () => reportProducts.value.find((item) => item.code === activeProductCode.value) ?? null
 );
+
+const activeDeliveryChannels = computed(
+  () => activeProduct.value?.deliveryChannels ?? reportJson.value.product?.deliveryChannels ?? ["web"]
+);
+
+const plannedProductNotice = computed(() => {
+  const plannedItems = Object.entries(PLANNED_REPORT_PRODUCTS).map(([code, config]) => ({
+    code,
+    label: config.label || `${code} 元版本`,
+    note: config.note || "当前尚未纳入正式交付。"
+  }));
+  if (!plannedItems.length) {
+    return "";
+  }
+  return plannedItems.map((item) => `${item.label}：${item.note}`).join("；");
+});
 
 const hasStructuredRecommendations = computed(
   () => recommendationTable.value.length > 0 || Boolean(firstChoice.value)
@@ -244,7 +266,7 @@ function parseStudentId() {
 
 function parseProductCode() {
   const rawValue = route.query.productCode;
-  return ["99", "399", "999"].includes(String(rawValue)) ? String(rawValue) : "399";
+  return normalizeReportProductCode(rawValue);
 }
 
 function formatScore(value) {
@@ -474,8 +496,21 @@ watch(
     >
       <template #actions>
         <el-button @click="goToStudentDetail">查看学生详情</el-button>
-        <el-button :loading="exporting === 'word'" @click="runExport('word')">导出 Word</el-button>
-        <el-button type="primary" :loading="exporting === 'pdf'" @click="runExport('pdf')">导出 PDF</el-button>
+        <el-button
+          v-if="activeDeliveryChannels.includes('word')"
+          :loading="exporting === 'word'"
+          @click="runExport('word')"
+        >
+          导出 Word
+        </el-button>
+        <el-button
+          v-if="activeDeliveryChannels.includes('pdf')"
+          type="primary"
+          :loading="exporting === 'pdf'"
+          @click="runExport('pdf')"
+        >
+          导出 PDF
+        </el-button>
       </template>
     </PageHeader>
 
@@ -544,6 +579,13 @@ watch(
               / 稳 {{ ruleSummary.strategy?.steady_ratio || 0 }}%
               / 保 {{ ruleSummary.strategy?.safe_ratio || 0 }}%
             </p>
+            <el-alert
+              v-if="plannedProductNotice"
+              type="info"
+              :closable="false"
+              class="planned-product-alert"
+              :title="`当前正式支持 99 / 399 / 999。${plannedProductNotice}`"
+            />
             <ul class="outline-list">
               <li
                 v-for="(item, index) in displayOutline"
@@ -569,6 +611,7 @@ watch(
                 <footer>
                   <em>{{ item.moduleCount }} 个模块 / 约 {{ item.suggestedPages || 0 }} 页</em>
                   <em>人工复核 {{ item.manualReviewCount }} 处</em>
+                  <em>交付渠道 {{ (item.deliveryChannels || []).join(" / ") || "待补充" }}</em>
                 </footer>
               </article>
             </section>
@@ -1594,6 +1637,10 @@ watch(
 .trace-item p {
   margin: 0;
   line-height: 1.7;
+}
+
+.planned-product-alert {
+  margin-top: 12px;
 }
 
 @media (max-width: 1199px) {

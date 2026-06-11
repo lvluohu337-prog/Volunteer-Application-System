@@ -17,6 +17,10 @@ from backend.admissions_engine import (
 )
 from backend.database import PROJECT_ROOT, db_session
 from backend.foundation_constants import COMPLIANCE_DISCLAIMER, INTERFACE_BOUNDARY_NOTE
+from backend.report_products import (
+    DEFAULT_REPORT_PRODUCT_CODE as FORMAL_DEFAULT_REPORT_PRODUCT_CODE,
+    REPORT_PRODUCT_CONFIG as FORMAL_REPORT_PRODUCT_CONFIG,
+)
 from backend.report_exporters import export_report_docx, export_report_pdf
 from backend.repository import EXAM_TYPE_LABELS, STATUS_LABELS, STATUS_VARIANTS, fetch_student_or_404, now_text, normalize_text
 from backend.rules_engine import (
@@ -156,28 +160,8 @@ DIRECTION_CATALOG = (
     },
 )
 
-DEFAULT_REPORT_PRODUCT_CODE = "399"
-
-REPORT_PRODUCT_CONFIG = {
-    "99": {
-        "label": "99 元基础版报告",
-        "description": "学生画像 + 专业方向 + 城市建议 + 简版冲稳保建议",
-        "target_user": "适合首轮筛选与家长初步沟通",
-        "delivery_channels": ["web", "pdf"],
-    },
-    "399": {
-        "label": "399 元进阶版报告",
-        "description": "完整志愿组合 + 院校专业分析 + 城市产业匹配 + 家长沟通解释",
-        "target_user": "适合正式出方案前的深度决策与交付",
-        "delivery_channels": ["web", "pdf", "word"],
-    },
-    "999": {
-        "label": "999 元人工咨询版底稿",
-        "description": "系统报告 + 咨询师补充备注 + 家长沟通脚本 + 人工推进清单",
-        "target_user": "适合一对一人工咨询、交付讲解与多轮调整",
-        "delivery_channels": ["web", "pdf", "word", "ppt"],
-    },
-}
+DEFAULT_REPORT_PRODUCT_CODE = FORMAL_DEFAULT_REPORT_PRODUCT_CODE
+REPORT_PRODUCT_CONFIG = FORMAL_REPORT_PRODUCT_CONFIG
 
 REPORT_TEMPLATE_SECTION_MAP = {
     "99": {
@@ -523,7 +507,7 @@ def _build_manual_consultation_sections(
                 "title": "导出与交付记录",
                 "body": (
                     f"最近一次系统生成时间：{latest_generation}；最近一次正式导出时间：{latest_delivery}。"
-                    "人工咨询版底稿建议在每轮沟通后都补充备注并重新导出，确保线上判断与线下交付保持一致。"
+                    "人工咨询版报告建议在每轮沟通后都补充备注并重新导出，确保线上判断与线下交付保持一致。"
                 ),
             },
         ]
@@ -746,8 +730,10 @@ def _build_report_product_catalog(selected_code: str) -> list[dict[str, Any]]:
             {
                 "code": code,
                 "label": config["label"],
+                "shortLabel": config.get("short_label") or config["label"],
                 "description": config["description"],
                 "targetUser": config["target_user"],
+                "deliveryChannels": list(config.get("delivery_channels") or []),
                 "moduleCount": len(product_rows),
                 "suggestedPages": suggested_pages,
                 "manualReviewCount": manual_review_count,

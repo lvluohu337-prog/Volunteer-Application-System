@@ -12,6 +12,11 @@ import {
   mapStudentIntakePayload,
   mapStudentListQuery
 } from "./contracts.js";
+import {
+  DEFAULT_REPORT_PRODUCT_CODE,
+  getReportProductLabel,
+  normalizeReportProductCode
+} from "../constants/reportProducts.js";
 
 const intakeTemplateFallback = {
   provinces: ["河南", "河北", "山东", "江苏", "安徽"],
@@ -319,14 +324,14 @@ export async function fetchPlanData(studentId, params = {}) {
   });
 }
 
-export async function fetchReportData(studentId, productCode = "399") {
+export async function fetchReportData(studentId, productCode = DEFAULT_REPORT_PRODUCT_CODE) {
+  const normalizedProductCode = normalizeReportProductCode(productCode);
   const resolvedStudentId = await resolveStudentId(studentId);
   if (!resolvedStudentId) {
-    const fallbackLabel = productCode === "99" ? "99 元基础版报告" : productCode === "999" ? "999 元人工咨询版底稿" : "399 元进阶版报告";
     return {
       ...emptyStudentDrivenState,
-      activeProductCode: productCode,
-      activeProductLabel: fallbackLabel,
+      activeProductCode: normalizedProductCode,
+      activeProductLabel: getReportProductLabel(normalizedProductCode),
       reportProducts: [],
       outline: [],
       sections: [],
@@ -342,7 +347,7 @@ export async function fetchReportData(studentId, productCode = "399") {
 
   return apiRequest(createPath(API_ENDPOINTS.reports.detail.path, { studentId: resolvedStudentId }), {
     method: API_ENDPOINTS.reports.detail.method,
-    query: { product_code: productCode }
+    query: { product_code: normalizedProductCode }
   });
 }
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from backend.report_products import REPORT_PRODUCT_LABELS
+
 
 COMPLIANCE_DISCLAIMER = (
     "本报告为高考志愿规划辅助建议，不承诺任何录取结果，也不能替代各省考试院官方政策、院校招生章程、"
@@ -48,9 +50,4 @@ ELEMENT_RULES = {
         "avoid": "不宜因为选择过多而反复摇摆、久拖不决。",
         "parent": "需要帮助孩子收敛方向，把优势聚焦到一条主线上。",
     },
-}
-
-REPORT_PRODUCT_LABELS = {
-    "99": "99 元报告演示版",
-    "399": "399 元报告演示版",
 }

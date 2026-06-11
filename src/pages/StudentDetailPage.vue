@@ -160,7 +160,7 @@ const flowSteps = computed(() => {
       statusLabel: canChooseReportVersion.value ? "可选择" : "待方案准备",
       statusVariant: canChooseReportVersion.value ? "primary" : "warning",
       summary: canChooseReportVersion.value
-        ? "已可以对比 99 / 399 / 699 / 999 报告版本差异。"
+        ? "已可以对比当前正式支持的 99 / 399 / 999 报告版本差异。"
         : "建议先完成志愿方案生成，再进入正式报告页。",
       nextHint: canChooseReportVersion.value ? "下一步：进入报告页选择合适价位版本。" : "先完成前面的基础和志愿方案步骤。",
       buttonLabel: canChooseReportVersion.value ? "去选报告版本" : "先完善前置步骤",

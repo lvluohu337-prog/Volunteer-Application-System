@@ -1,0 +1,33 @@
+{
+  "defaultProductCode": "399",
+  "formalProducts": {
+    "99": {
+      "label": "99 元基础版报告",
+      "shortLabel": "99 元基础版",
+      "description": "适合首轮方向判断与家长初步沟通，交付基础画像、专业方向、城市建议和基础风险提示。",
+      "targetUser": "适合首轮筛选与解释型交付",
+      "deliveryChannels": ["web", "pdf"]
+    },
+    "399": {
+      "label": "399 元标准版报告",
+      "shortLabel": "399 元标准版",
+      "description": "当前正式可执行的标准志愿方案交付，包含结构化推荐表、冲稳保建议、第一志愿、备选与风险提示。",
+      "targetUser": "适合正式方案确认与标准交付",
+      "deliveryChannels": ["web", "pdf", "word"]
+    },
+    "999": {
+      "label": "999 元人工咨询版报告",
+      "shortLabel": "999 元人工咨询版",
+      "description": "在标准版基础上叠加咨询师补充备注、家长沟通脚本、多轮调整和正式交付留痕。",
+      "targetUser": "适合一对一人工咨询与多轮交付",
+      "deliveryChannels": ["web", "pdf", "word"]
+    }
+  },
+  "plannedProducts": {
+    "699": {
+      "label": "699 元深度版",
+      "status": "planned",
+      "note": "当前尚未形成正式可交付能力，不属于现阶段系统正式产品口径。"
+    }
+  }
+}
