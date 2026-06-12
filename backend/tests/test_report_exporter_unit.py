@@ -46,6 +46,8 @@ class ReportExporterUnitTest(unittest.TestCase):
         self.assertIn("备选志愿建议", extracted_text)
         self.assertIn("不建议报考项", extracted_text)
         self.assertIn("调剂风险", extracted_text)
+        self.assertIn("合规提示", extracted_text)
+        self.assertIn("保录", extracted_text)
         self.assertIn("咨询师签字", extracted_text)
 
     def test_export_report_docx_generates_real_docx(self):
@@ -73,6 +75,8 @@ class ReportExporterUnitTest(unittest.TestCase):
         self.assertIn("备选志愿建议", document_xml)
         self.assertIn("不建议报考项", document_xml)
         self.assertIn("调剂风险", document_xml)
+        self.assertIn("合规提示", document_xml)
+        self.assertIn("保录", document_xml)
         self.assertIn("咨询师签字", document_xml)
 
 

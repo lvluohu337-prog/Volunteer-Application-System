@@ -8,6 +8,8 @@ import zipfile
 import zlib
 from xml.sax.saxutils import escape
 
+from backend.compliance import COMPLIANCE_COPY_RULES, COMPLIANCE_DISCLAIMER, INTERFACE_BOUNDARY_NOTE
+
 
 PDF_PAGE_WIDTH = 595.28
 PDF_PAGE_HEIGHT = 841.89
@@ -111,7 +113,10 @@ def _build_report_blocks(
             blocks.append(ReportBlock("bullet", f"{note_title}：{note_content}"))
 
     blocks.append(ReportBlock("heading", "合规提示"))
-    blocks.append(ReportBlock("body", str(report_data.get("disclaimer") or "")))
+    blocks.append(ReportBlock("body", str(report_data.get("disclaimer") or COMPLIANCE_DISCLAIMER)))
+    blocks.append(ReportBlock("body", f"接口边界：{str(report_data.get('boundaryNote') or INTERFACE_BOUNDARY_NOTE)}"))
+    for rule in COMPLIANCE_COPY_RULES:
+        blocks.append(ReportBlock("bullet", rule))
 
     if include_signature:
         blocks.append(ReportBlock("heading", "签字确认"))

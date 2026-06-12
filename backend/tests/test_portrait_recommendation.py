@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from backend.compliance import PORTRAIT_DISCLAIMER
 from backend.intake_inference import derive_birth_profile
 from backend.planning_repository import _build_derived_profile_summary, _build_portrait_major_recommendation
 
@@ -47,7 +48,7 @@ class PortraitRecommendationTest(unittest.TestCase):
         self.assertEqual(result["preferredDirection"], "计算机类")
         self.assertIn("计算机类", result["recommendedMajorDirections"])
         self.assertTrue(result["majorFitReasons"])
-        self.assertIn("不参与录取概率", result["disclaimer"])
+        self.assertEqual(result["disclaimer"], PORTRAIT_DISCLAIMER)
         self.assertTrue(result["hardEvidence"])
 
     def test_portrait_recommendation_prompts_for_more_profile_when_missing(self):

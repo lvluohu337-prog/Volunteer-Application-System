@@ -17,6 +17,7 @@ import {
   getReportProductLabel,
   normalizeReportProductCode
 } from "../constants/reportProducts.js";
+import { INTAKE_DISCLAIMER } from "../constants/compliance.js";
 
 const intakeTemplateFallback = {
   provinces: ["河南", "河北", "山东", "江苏", "安徽"],
@@ -118,7 +119,7 @@ const intakeTemplateFallback = {
     { value: "21:30", label: "亥时 21:00-22:59" }
   ],
   birthday_notice: "请输入学生阳历生日与出生时辰，系统会自动辅助推算星座、八字四柱和兴趣倾向。",
-  disclaimer: "系统结果仅作志愿填报辅助参考，所有结论仍需老师人工复核。"
+  disclaimer: INTAKE_DISCLAIMER
 };
 
 const derivedProfileFallback = {

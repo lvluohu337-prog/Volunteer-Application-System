@@ -15,6 +15,13 @@ from backend.admissions_engine import (
     group_major_recommendations,
     match_admissions_candidates,
 )
+from backend.compliance import (
+    COMPLIANCE_COPY_RULES,
+    PORTRAIT_DISCLAIMER,
+    PORTRAIT_EXPLANATION_NOTE,
+    PORTRAIT_HARD_EVIDENCE,
+    find_prohibited_promise_phrases,
+)
 from backend.database import PROJECT_ROOT, db_session
 from backend.foundation_constants import COMPLIANCE_DISCLAIMER, INTERFACE_BOUNDARY_NOTE
 from backend.report_products import (
@@ -571,6 +578,9 @@ def _render_report_markdown(report_data: dict[str, Any]) -> str:
     lines.append("## 合规提示")
     lines.append(report_data.get("disclaimer") or COMPLIANCE_DISCLAIMER)
     lines.append("")
+    lines.append(f"接口边界：{report_data.get('boundaryNote') or INTERFACE_BOUNDARY_NOTE}")
+    lines.extend(f"- {rule}" for rule in COMPLIANCE_COPY_RULES)
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -584,6 +594,7 @@ def _render_report_html(report_data: dict[str, Any]) -> str:
         for item in (report_data.get("advisorNotes") or [])
     )
     advisor_block = f"<section><h2>咨询师补充备注</h2><ul>{advisor_notes_html}</ul></section>" if advisor_notes_html else ""
+    compliance_rules_html = "".join(f"<li>{rule}</li>" for rule in COMPLIANCE_COPY_RULES)
     return f"""
 <!doctype html>
 <html lang="zh-CN">
@@ -604,7 +615,11 @@ def _render_report_html(report_data: dict[str, Any]) -> str:
   <div class="meta">{report_data.get('reportSubtitle') or ''} / {report_data.get('activeProductLabel') or '报告版本'}</div>
   {sections_html}
   {advisor_block}
-  <div class="warning">{report_data.get('disclaimer') or COMPLIANCE_DISCLAIMER}</div>
+  <div class="warning">
+    <p>{report_data.get('disclaimer') or COMPLIANCE_DISCLAIMER}</p>
+    <p>接口边界：{report_data.get('boundaryNote') or INTERFACE_BOUNDARY_NOTE}</p>
+    <ul>{compliance_rules_html}</ul>
+  </div>
 </body>
 </html>
 """.strip()
@@ -846,6 +861,8 @@ def _build_formal_report_json(
             "targetUser": product_config["target_user"],
             "deliveryChannels": product_config["delivery_channels"],
         },
+        "boundaryNote": INTERFACE_BOUNDARY_NOTE,
+        "complianceRules": list(COMPLIANCE_COPY_RULES),
         "studentSnapshot": {
             "name": student.get("name") or "学生",
             "province": student.get("province") or "",
@@ -888,6 +905,7 @@ def _build_formal_report_json(
         "dataBoundary": {
             "disclaimer": COMPLIANCE_DISCLAIMER,
             "boundaryNote": INTERFACE_BOUNDARY_NOTE,
+            "copyRules": list(COMPLIANCE_COPY_RULES),
         },
     }
 
@@ -1120,6 +1138,18 @@ def create_report_advisor_note(student_id: int, payload: Any) -> dict[str, Any]:
     fetch_student_or_404(student_id)
     timestamp = now_text()
     product_code = _normalize_report_product_code(getattr(payload, "product_code", None))
+    note_title = normalize_text(getattr(payload, "note_title", None))
+    note_content = normalize_text(getattr(payload, "note_content", None))
+    prohibited_phrases = find_prohibited_promise_phrases(note_title, note_content)
+    if prohibited_phrases:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "咨询师备注中包含禁止使用的承诺性表述："
+                + "、".join(prohibited_phrases)
+                + "。请改为风险提示、条件说明或人工复核建议。"
+            ),
+        )
 
     with db_session() as connection:
         cursor = connection.execute(
@@ -1139,8 +1169,8 @@ def create_report_advisor_note(student_id: int, payload: Any) -> dict[str, Any]:
                 student_id,
                 product_code,
                 normalize_text(getattr(payload, "note_type", None)) or "advisor_comment",
-                normalize_text(getattr(payload, "note_title", None)),
-                normalize_text(getattr(payload, "note_content", None)),
+                note_title,
+                note_content,
                 normalize_text(getattr(payload, "author_name", None)) or "咨询师",
                 timestamp,
                 timestamp,
@@ -1400,7 +1430,7 @@ def _build_portrait_major_recommendation(
             "hardEvidence": [
                 "正式志愿录取判断仍只使用分数、位次、选科、批次、计划和历年录取数据。",
             ],
-            "disclaimer": "前六段、八字、星座、五行和性格画像仅用于辅助解释，不参与录取概率与冲稳保判断。",
+            "disclaimer": PORTRAIT_DISCLAIMER,
         }
 
     scored_directions: list[dict[str, Any]] = []
@@ -1475,9 +1505,7 @@ def _build_portrait_major_recommendation(
     top_parent = top_reasons[0] if top_reasons else None
 
     subject_match_summary = top_reasons[0]["subjectMatch"] if top_reasons else "待补充选科匹配说明。"
-    auxiliary_explanations = list(dict.fromkeys((profile.get("explanations") or []) + [
-        "画像辅助推荐只用于解释专业方向、环境适配与家长沟通，不参与录取概率和冲稳保判断。",
-    ]))
+    auxiliary_explanations = list(dict.fromkeys((profile.get("explanations") or []) + [PORTRAIT_EXPLANATION_NOTE]))
 
     return {
         "hasPortraitData": True,
@@ -1493,11 +1521,8 @@ def _build_portrait_major_recommendation(
         },
         "subjectMatchSummary": subject_match_summary,
         "auxiliaryExplanation": auxiliary_explanations,
-        "hardEvidence": [
-            "正式录取判断仍以高考成绩、全省位次、选科组合、批次、招生计划和历年录取数据为核心依据。",
-            "画像辅助推荐只做专业方向与沟通解释，不单独决定能否录取。",
-        ],
-        "disclaimer": "前六段、八字、星座、五行和性格画像仅用于辅助解释，不参与录取概率、冲稳保比例和正式录取结论。",
+        "hardEvidence": list(PORTRAIT_HARD_EVIDENCE),
+        "disclaimer": PORTRAIT_DISCLAIMER,
     }
 
 
@@ -2611,12 +2636,7 @@ def get_dashboard_data() -> dict[str, Any]:
 
 def get_settings_data() -> dict[str, Any]:
     return {
-        "copyRules": [
-            "系统结果仅作辅助参考，不替代人工研判。",
-            "禁止使用保录、必中、100% 录取等承诺性表述。",
-            "正式交付前必须保留人工复核与统一免责说明。",
-            "前六字、八字、星座、性格标签只能作为辅助解释，不能替代真实招生数据。",
-        ],
+        "copyRules": list(COMPLIANCE_COPY_RULES),
         "boundaryNote": INTERFACE_BOUNDARY_NOTE,
     }
 
@@ -2930,6 +2950,7 @@ def get_student_report(
             ),
             "disclaimer": COMPLIANCE_DISCLAIMER,
             "boundaryNote": INTERFACE_BOUNDARY_NOTE,
+            "copyRules": list(COMPLIANCE_COPY_RULES),
         }
 
     major_results = _major_rule_results(student)
@@ -3005,6 +3026,7 @@ def get_student_report(
         ),
         "disclaimer": COMPLIANCE_DISCLAIMER,
         "boundaryNote": INTERFACE_BOUNDARY_NOTE,
+        "copyRules": list(COMPLIANCE_COPY_RULES),
     }
 
 

@@ -6,6 +6,7 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
+from backend.compliance import INTAKE_DISCLAIMER
 from backend.database import init_db
 from backend.foundation_repository import (
     list_city_industries,
@@ -186,7 +187,7 @@ def get_intake_template():
                 "rank": None,
             },
             "birthday_notice": "请输入学生阳历生日与出生时辰，系统会自动辅助推算星座、八字四柱和兴趣倾向。",
-            "disclaimer": "系统结果仅作志愿填报辅助参考，正式方案仍需结合分数、位次、招生计划、院校章程和人工复核。",
+            "disclaimer": INTAKE_DISCLAIMER,
         }
     )
 

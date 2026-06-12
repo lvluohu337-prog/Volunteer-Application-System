@@ -1,18 +1,6 @@
 from __future__ import annotations
 
-from backend.report_products import REPORT_PRODUCT_LABELS
-
-
-COMPLIANCE_DISCLAIMER = (
-    "本报告为高考志愿规划辅助建议，不承诺任何录取结果，也不能替代各省考试院官方政策、院校招生章程、"
-    "正式分数位次、一分一段表和当年招生计划。前六字、八字、星座、性格画像等内容仅作辅助解释，"
-    "不能作为唯一填报依据。最终志愿方案仍需结合官方数据、院校规则、家庭实际情况和学生本人意愿综合判断。"
-)
-
-INTERFACE_BOUNDARY_NOTE = (
-    "接口返回内容仅用于演示与辅助判断，凡涉及分数、位次、专业、城市和录取结论，"
-    "均需以当年官方信息和人工复核结果为准。"
-)
+from backend.compliance import COMPLIANCE_DISCLAIMER, INTERFACE_BOUNDARY_NOTE
 
 ELEMENT_RULES = {
     "木": {

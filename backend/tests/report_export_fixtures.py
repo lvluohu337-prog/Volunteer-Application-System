@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from backend.compliance import COMPLIANCE_DISCLAIMER, INTERFACE_BOUNDARY_NOTE
+
 
 _MINIMAL_REPORT_DATA = {
     "reportTitle": "胡祥荟 志愿规划报告",
@@ -114,7 +116,8 @@ _MINIMAL_REPORT_DATA = {
             "note_content": "导出测试应生成真实 PDF 与 DOCX 文件，而不是中间 HTML 或 Markdown。"
         }
     ],
-    "disclaimer": "本报告为高考志愿规划辅助建议，不承诺任何录取结果。"
+    "disclaimer": COMPLIANCE_DISCLAIMER,
+    "boundaryNote": INTERFACE_BOUNDARY_NOTE,
 }
 
 

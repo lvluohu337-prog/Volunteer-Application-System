@@ -11,7 +11,11 @@ import {
 import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
 import StatusTag from "../components/StatusTag.vue";
-import { COMPLIANCE_DISCLAIMER } from "../constants/compliance.js";
+import {
+  COMPLIANCE_COPY_RULES,
+  COMPLIANCE_DISCLAIMER,
+  findProhibitedPromisePhrases
+} from "../constants/compliance.js";
 import {
   DEFAULT_REPORT_PRODUCT_CODE,
   getReportProductLabel,
@@ -213,6 +217,7 @@ const fallbackNextSteps = [
   "回到学生详情补齐最新成绩、位次、选科与目标边界，再重新触发推荐链路。",
   "待命中真实招生候选后，再进入志愿方案和报告页完成人工复核与正式导出。"
 ];
+const complianceRules = COMPLIANCE_COPY_RULES;
 
 const recommendationBuckets = computed(() => {
   const grouped = { rush: [], steady: [], safe: [] };
@@ -401,6 +406,14 @@ async function submitAdvisorNote() {
     emit("open-dialog", "请先填写咨询师补充备注内容，再保存到当前报告。");
     return;
   }
+  const prohibitedPhrases = findProhibitedPromisePhrases(noteForm.value.note_title, noteForm.value.note_content);
+  if (prohibitedPhrases.length) {
+    emit(
+      "open-dialog",
+      `当前备注包含禁止使用的承诺性表述：${prohibitedPhrases.join("、")}。\n请改为风险提示、条件说明或人工复核建议后再保存。`
+    );
+    return;
+  }
 
   savingNote.value = true;
   try {
@@ -412,6 +425,8 @@ async function submitAdvisorNote() {
     noteForm.value.note_content = "";
     await loadPageData();
     emit("open-dialog", "咨询师补充备注已保存，并同步进入当前报告留痕。");
+  } catch (error) {
+    emit("open-dialog", error.message || "咨询师备注保存失败，请检查合规表述后重试。");
   } finally {
     savingNote.value = false;
   }
@@ -994,6 +1009,9 @@ watch(
               <section class="paper-section paper-warning">
                 <h3>合规免责说明</h3>
                 <p>{{ disclaimer }}</p>
+                <ul class="paper-list">
+                  <li v-for="rule in complianceRules" :key="rule">{{ rule }}</li>
+                </ul>
               </section>
             </section>
 
@@ -1066,6 +1084,9 @@ watch(
                     </el-button>
                   </div>
                 </div>
+                <p class="table-note">
+                  顾问备注同样适用统一合规口径：{{ complianceRules[3] || "禁止使用承诺性表述。" }}
+                </p>
                 <div v-if="advisorNotes.length" class="trace-list">
                   <article
                     v-for="note in advisorNotes"
@@ -1559,6 +1580,13 @@ watch(
   background: #f6f9fd;
   color: var(--app-text-secondary);
   font-weight: 600;
+}
+
+.paper-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--app-text-secondary);
+  line-height: 1.7;
 }
 
 .auxiliary-section {

@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
+from backend.compliance import PORTRAIT_DISCLAIMER
+
 
 HEAVENLY_STEMS = "甲乙丙丁戊己庚辛壬癸"
 EARTHLY_BRANCHES = "子丑寅卯辰巳午未申酉戌亥"
@@ -409,5 +411,5 @@ def derive_birth_profile(birthday: str | None, birth_time: str | None = None) ->
             "region_preference": "、".join(region_preferences[:3]) if region_preferences else None,
             "development_goal": "、".join(development_goals[:3]) if development_goals else None,
         },
-        "disclaimer": "前六字、八字四柱、星座和五行倾向仅作为辅助分析，不替代真实招生数据和正式填报规则。",
+        "disclaimer": PORTRAIT_DISCLAIMER,
     }

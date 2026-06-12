@@ -1,2 +1,26 @@
-export const COMPLIANCE_DISCLAIMER =
-  "本报告为高考志愿规划辅助建议，不承诺任何录取结果，不替代各省考试院官方政策、高校招生章程、正式分数位次、一分一段表和当年招生计划。前六字、性格画像、星座解释等内容仅作为辅助参考，不作为唯一填报依据。最终志愿填报应结合官方数据、院校章程、家庭实际情况和学生本人意愿综合判断。";
+import complianceDefinition from "../../shared/compliance.json";
+
+export const COMPLIANCE_DISCLAIMER = complianceDefinition.disclaimer || "";
+export const INTERFACE_BOUNDARY_NOTE = complianceDefinition.interfaceBoundaryNote || "";
+export const INTAKE_DISCLAIMER = complianceDefinition.intakeDisclaimer || COMPLIANCE_DISCLAIMER;
+export const PORTRAIT_DISCLAIMER = complianceDefinition.portraitDisclaimer || "";
+export const COMPLIANCE_COPY_RULES = complianceDefinition.copyRules || [];
+export const PROHIBITED_PROMISE_PHRASES = complianceDefinition.prohibitedPromisePhrases || [];
+
+function normalizeForPhraseMatch(value) {
+  return String(value || "").replace(/\s+/g, "").toLowerCase();
+}
+
+export function findProhibitedPromisePhrases(...values) {
+  const haystack = normalizeForPhraseMatch(values.filter(Boolean).join(" "));
+  const hits = [];
+  PROHIBITED_PROMISE_PHRASES.forEach((phrase) => {
+    if (!phrase) {
+      return;
+    }
+    if (haystack.includes(normalizeForPhraseMatch(phrase)) && !hits.includes(phrase)) {
+      hits.push(phrase);
+    }
+  });
+  return hits;
+}
