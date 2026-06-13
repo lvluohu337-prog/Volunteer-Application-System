@@ -25,6 +25,7 @@ from backend.planning_repository import (
     get_student_plan,
     get_student_report,
 )
+from backend.province_support import build_province_support_summary
 from backend.repository import (
     create_score_record,
     create_student,
@@ -86,9 +87,11 @@ def get_dashboard():
 
 @app.get("/api/intake/template")
 def get_intake_template():
+    province_support = build_province_support_summary()
     return success_response(
         {
-            "provinces": ["河南", "河北", "山东", "江苏", "安徽", "广东", "浙江", "四川"],
+            "provinces": province_support["formalSupportedProvinces"],
+            "province_support": province_support,
             "exam_types": [
                 {"value": "gaokao", "label": "高考"},
                 {"value": "zhongkao", "label": "中考"},

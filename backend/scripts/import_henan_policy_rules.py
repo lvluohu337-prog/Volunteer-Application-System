@@ -13,7 +13,7 @@ from backend.admissions_repository import (
     upsert_institution_rules,
     upsert_policy_trends,
 )
-from backend.database import init_db
+from backend.database import db_session, init_db
 from backend.excel_importer import write_csv, write_json
 from backend.policy_importer import load_henan_policy_rule_datasets
 
@@ -37,6 +37,52 @@ def _write_normalized_files(datasets: dict[str, list[dict[str, object]]]) -> Non
         write_csv(IMPORTED_DIR / f"{key}.sample.csv", sample_rows)
 
 
+def _replace_existing_policy_trends(policy_rows: list[dict[str, object]]) -> int:
+    policy_keys = sorted({str(row.get("policy_key") or "").strip() for row in policy_rows if str(row.get("policy_key") or "").strip()})
+    if not policy_keys:
+        return 0
+
+    placeholders = ", ".join(["?"] * len(policy_keys))
+    with db_session() as connection:
+        before = connection.execute(
+            f"SELECT COUNT(*) AS total FROM policy_trends WHERE policy_key IN ({placeholders})",
+            policy_keys,
+        ).fetchone()
+        connection.execute(
+            f"DELETE FROM policy_trends WHERE policy_key IN ({placeholders})",
+            policy_keys,
+        )
+    return int(before["total"]) if before else 0
+
+
+def _replace_existing_admission_risk_rules(risk_rows: list[dict[str, object]]) -> int:
+    policy_keys = sorted({str(row.get("policy_key") or "").strip() for row in risk_rows if str(row.get("policy_key") or "").strip()})
+    if not policy_keys:
+        return 0
+
+    deleted_total = 0
+    with db_session() as connection:
+        for policy_key in policy_keys:
+            like_pattern = f'%\"policy_key\":\"{policy_key}\"%'
+            before = connection.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM admission_risk_rules
+                WHERE raw_json LIKE ?
+                """,
+                [like_pattern],
+            ).fetchone()
+            connection.execute(
+                """
+                DELETE FROM admission_risk_rules
+                WHERE raw_json LIKE ?
+                """,
+                [like_pattern],
+            )
+            deleted_total += int(before["total"]) if before else 0
+    return deleted_total
+
+
 def main() -> None:
     args = parse_args()
     if not args.dry_run:
@@ -53,6 +99,10 @@ def main() -> None:
     }
 
     if not args.dry_run:
+        summary["replaced_rows"] = {
+            "policy_trends": _replace_existing_policy_trends(datasets["policy_trends"]),
+            "admission_risk_rules": _replace_existing_admission_risk_rules(datasets["admission_risk_rules"]),
+        }
         import_counts = {
             "policy_trends": upsert_policy_trends(datasets["policy_trends"]),
             "admission_risk_rules": upsert_admission_risk_rules(datasets["admission_risk_rules"]),

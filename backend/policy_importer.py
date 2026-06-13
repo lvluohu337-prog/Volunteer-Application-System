@@ -288,6 +288,32 @@ POLICY_DOCUMENTS = [
         ],
     },
     {
+        "policy_key": "henan_2026_registration_faq",
+        "file_name": "河南省2026年普通高招报名工作相关事宜问答.docx",
+        "exam_year": 2026,
+        "province": "河南",
+        "trend_type": "registration_rule",
+        "impact_scope": "special_admission_candidates",
+        "summary_keywords": ["报名资格审核", "高职单招", "运动训练", "资格审核", "现场确认"],
+        "rule_mode": "global_only",
+        "risk_rules": [
+            {
+                "risk_type": "special_registration_review",
+                "display_label": "特殊类型招生报名资格复核",
+                "risk_level": "high",
+                "trigger": {
+                    "match_any": [
+                        {"field": "batch_code", "contains_any": ["单招", "运动训练", "武术", "保送", "消防救援"]},
+                        {"field": "plan_notes", "contains_any": ["高职单招", "运动训练", "武术与民族传统体育", "保送", "消防救援"]},
+                    ]
+                },
+                "keywords": ["报名资格审核", "高职单招", "运动训练", "武术与民族传统体育专业单招"],
+                "default_message": "特殊类型招生并非只满足分数即可报考，还要求考生已完成全省统一报名、现场确认和资格审核。",
+                "mitigation_suggestion": "遇到单招、运动训练、武术类或其他特殊招生项目时，先复核报名类别与资格审核状态，再保留志愿。",
+            },
+        ],
+    },
+    {
         "policy_key": "henan_2026_sports_exam",
         "file_name": "河南省2026年普通高校招生体育类专业招生考试相关事宜提醒.docx",
         "exam_year": 2026,
@@ -310,6 +336,20 @@ POLICY_DOCUMENTS = [
                 "keywords": ["体育类专业", "考试"],
                 "default_message": "体育类专业需同时满足专业考试与文化成绩规则，不能按普通文化类专业理解。",
                 "mitigation_suggestion": "将专业考试成绩、合格线和文化课要求一并纳入风险判断。",
+            },
+            {
+                "risk_type": "sports_score_structure",
+                "display_label": "体育类文化课与专业成绩并行",
+                "risk_level": "medium",
+                "trigger": {
+                    "match_any": [
+                        {"field": "batch_code", "contains_any": ["体育"]},
+                        {"field": "major_name", "contains_any": ["体育"]},
+                    ]
+                },
+                "keywords": ["体育类专业", "招生考试", "考试"],
+                "default_message": "体育类志愿的录取判断需要同时看专业测试和文化课，不适合只按普通分数线理解“稳妥”程度。",
+                "mitigation_suggestion": "把体育专业测试表现、文化课达线情况和批次投档办法放在同一张核验清单里复核。",
             },
         ],
     },
@@ -337,6 +377,142 @@ POLICY_DOCUMENTS = [
                 "default_message": "艺术类专业录取同时依赖专业考试与文化成绩规则，填报前需复核对应类别的考试与投档办法。",
                 "mitigation_suggestion": "把专业合格情况与文化分同时作为保留艺术志愿的前提。",
             },
+            {
+                "risk_type": "arts_category_alignment",
+                "display_label": "艺术类专业类别匹配",
+                "risk_level": "medium",
+                "trigger": {
+                    "match_any": [
+                        {"field": "batch_code", "contains_any": ["艺术"]},
+                        {"field": "major_name", "contains_any": ["艺术", "设计", "音乐", "美术", "舞蹈"]},
+                    ]
+                },
+                "keywords": ["艺术类专业", "考试", "艺术类"],
+                "default_message": "艺术类不同专业类别的考试办法、合格要求和投档规则可能不同，不能把一个类别的结果直接套到所有艺术志愿上。",
+                "mitigation_suggestion": "逐个核对专业所属艺术类别、专业合格状态和对应投档办法，避免跨类别误判。",
+            },
+        ],
+    },
+    {
+        "policy_key": "henan_2025_single_exam",
+        "file_name": "河南省教育厅关于做好2025年高等职业教育单独考试招生和技能拔尖人才免试入学工作的通知- 文件通知 - 河南省教育厅.pdf",
+        "exam_year": 2025,
+        "province": "河南",
+        "trend_type": "special_batch_rule",
+        "impact_scope": "single_exam_candidates",
+        "summary_keywords": ["高职单招", "招生章程", "志愿填报", "职业技能测试", "免文化素质考试"],
+        "rule_mode": "global_only",
+        "risk_rules": [
+            {
+                "risk_type": "single_exam_one_choice",
+                "display_label": "高职单招仅限单校志愿",
+                "risk_level": "high",
+                "trigger": {
+                    "match_any": [
+                        {"field": "batch_code", "contains_any": ["单招"]},
+                        {"field": "plan_notes", "contains_any": ["高职单招", "单独考试招生"]},
+                    ]
+                },
+                "keywords": ["志愿填报", "高职单招"],
+                "default_message": "高职单招通常只能填报一所高校志愿，且修改次数和填报时间窗口都很有限，不能按普通批多志愿逻辑理解。",
+                "mitigation_suggestion": "把高职单招单独做成一套方案，先确认唯一志愿选择和时间节点，再决定是否保留。",
+            },
+            {
+                "risk_type": "single_exam_skill_test",
+                "display_label": "高职单招职业技能测试要求",
+                "risk_level": "high",
+                "trigger": {
+                    "match_any": [
+                        {"field": "batch_code", "contains_any": ["单招"]},
+                        {"field": "plan_notes", "contains_any": ["高职单招", "职业技能测试", "职业适应性测试"]},
+                    ]
+                },
+                "keywords": ["职业技能测试", "职业适应性测试", "文化素质"],
+                "default_message": "高职单招不是只看文化课，通常还要参加职业技能测试或职业适应性测试，且技能测试分值占比较高。",
+                "mitigation_suggestion": "正式保留高职单招志愿前，先核对目标院校章程中的测试方式、考试时间和成绩构成。",
+            },
+            {
+                "risk_type": "single_exam_charter_review",
+                "display_label": "高职单招章程差异大",
+                "risk_level": "medium",
+                "trigger": {
+                    "match_any": [
+                        {"field": "batch_code", "contains_any": ["单招"]},
+                        {"field": "plan_notes", "contains_any": ["高职单招", "招生章程"]},
+                    ]
+                },
+                "keywords": ["招生章程", "考试科目", "录取规则"],
+                "default_message": "高职单招章程会分别写明考试科目、录取规则、学费与资助政策，学校之间差异较大，不能简单套用同类院校经验。",
+                "mitigation_suggestion": "把目标院校的单招章程作为最终依据，逐项复核考试科目、录取规则、学费和资助说明。",
+            },
+        ],
+    },
+    {
+        "policy_key": "henan_2026_counterpart_work",
+        "file_name": "河南省教育厅关于做好2026年普通高等学校对口招收中等职业学校毕业生工作的通知- 文件通知 - 河南省教育厅.pdf",
+        "exam_year": 2026,
+        "province": "河南",
+        "trend_type": "special_batch_rule",
+        "impact_scope": "counterpart_candidates",
+        "summary_keywords": ["对口招生", "报名资格审核", "专业对照", "体育类专业", "音乐与舞蹈类专业", "美术与设计类专业"],
+        "rule_mode": "global_only",
+        "risk_rules": [
+            {
+                "risk_type": "counterpart_eligibility",
+                "display_label": "对口招生资格审核",
+                "risk_level": "high",
+                "trigger": {
+                    "match_any": [
+                        {"field": "batch_code", "contains_any": ["对口"]},
+                        {"field": "plan_notes", "contains_any": ["对口招生", "中等职业学校毕业生"]},
+                    ]
+                },
+                "keywords": ["报名资格审核", "中等职业学校学籍", "资格审核贯穿全过程"],
+                "default_message": "对口招生不是普通高考平替，考生必须具备对应中职学籍与报名资格，且资格审核贯穿报名、考试和录取全过程。",
+                "mitigation_suggestion": "保留对口志愿前先核对学籍状态、报名类别和资格审核结论，避免后续被取消资格。",
+            },
+            {
+                "risk_type": "counterpart_major_alignment",
+                "display_label": "对口招生专业对照要求",
+                "risk_level": "high",
+                "trigger": {
+                    "match_any": [
+                        {"field": "batch_code", "contains_any": ["对口"]},
+                        {"field": "plan_notes", "contains_any": ["对口招生", "专业对照"]},
+                    ]
+                },
+                "keywords": ["专业对照", "所学专业与报考专业应符合"],
+                "default_message": "对口招生要求考生所学中职专业与报考高校专业满足官方专业对照关系，不是所有中职专业都能自由跨报。",
+                "mitigation_suggestion": "先对照官方专业对照表确认可报专业范围，再做冲稳保筛选。",
+            },
+            {
+                "risk_type": "counterpart_sports_exam",
+                "display_label": "对口体育类专项考试",
+                "risk_level": "high",
+                "trigger": {
+                    "match_any": [
+                        {"field": "batch_code", "contains_any": ["对口", "体育"]},
+                        {"field": "major_name", "contains_any": ["体育"]},
+                    ]
+                },
+                "keywords": ["体育类专业", "身体素质", "统一考试"],
+                "default_message": "对口体育类专业除文化课外，还要按统一标准完成身体素质测试，录取判断不能只看文化分。",
+                "mitigation_suggestion": "对口体育志愿要把身体素质项目、文化课和统一考试标准放在一起评估。",
+            },
+            {
+                "risk_type": "counterpart_arts_exam",
+                "display_label": "对口艺术类专项考试",
+                "risk_level": "high",
+                "trigger": {
+                    "match_any": [
+                        {"field": "batch_code", "contains_any": ["对口"]},
+                        {"field": "major_name", "contains_any": ["音乐", "舞蹈", "美术", "设计", "艺术"]},
+                    ]
+                },
+                "keywords": ["音乐与舞蹈类专业", "美术与设计类专业", "专业主科"],
+                "default_message": "对口艺术类专业通常还包含视唱、专业主科或造型基础等专项考试，不能把普通文化类位次直接套用到这类志愿上。",
+                "mitigation_suggestion": "逐项核对艺术类别、专项考试科目与分值，再判断该志愿是否还能保留在正式方案中。",
+            },
         ],
     },
 ]
@@ -347,11 +523,39 @@ def _normalize_text(value: str | None) -> str:
     return re.sub(r"[ \t]+", " ", text)
 
 
+def _is_noise_line(text: str) -> bool:
+    normalized = _normalize_text(text)
+    if not normalized:
+        return True
+    noise_tokens = (
+        "用户中心",
+        "中国政府网",
+        "教育部",
+        "河南省政府网",
+        "设为首页",
+        "加入收藏",
+        "进入适老模式",
+        "无障碍阅读",
+        "首页 >",
+        "分享：",
+        "浏览字号",
+        "来源：",
+        "首页",
+        "首 页",
+        "教育动态",
+        "政务公开",
+        "政务服务",
+        "交流互动",
+        "专题子站",
+    )
+    return any(token in normalized for token in noise_tokens)
+
+
 def _compact_lines(text: str) -> list[str]:
     return [
         _normalize_text(line)
         for line in text.splitlines()
-        if _normalize_text(line)
+        if _normalize_text(line) and not _is_noise_line(line)
     ]
 
 
@@ -434,6 +638,42 @@ def _pick_snippets(text: str, keywords: list[str], limit: int = 3) -> list[str]:
     return hits
 
 
+def _clean_snippet(text: str) -> str:
+    normalized = _normalize_text(text)
+    if not normalized:
+        return ""
+
+    normalized = re.sub(r"^[一二三四五六七八九十0-9]+[\.、]\s*", "", normalized)
+    normalized = normalized.strip("；;，,。:：")
+    banned_prefixes = (
+        "的说明和解释",
+        "以下简称",
+        "发布日期",
+        "您好，今天是",
+    )
+    for prefix in banned_prefixes:
+        if normalized.startswith(prefix):
+            return ""
+
+    if len(normalized) < 8 and not re.search(r"\d", normalized):
+        return ""
+    return normalized
+
+
+def _clean_snippets(snippets: list[str], limit: int = 3) -> list[str]:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for snippet in snippets:
+        normalized = _clean_snippet(snippet)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        cleaned.append(normalized)
+        if len(cleaned) >= limit:
+            break
+    return cleaned
+
+
 def _build_trigger_text(trigger: dict[str, object] | None) -> str | None:
     if not trigger:
         return None
@@ -441,15 +681,20 @@ def _build_trigger_text(trigger: dict[str, object] | None) -> str | None:
 
 
 def _summary_from_doc(document: dict[str, object], text: str) -> str:
-    snippets = _pick_snippets(text, list(document.get("summary_keywords") or []), limit=3)
-    return "；".join(snippets[:3])
+    snippets = _clean_snippets(_pick_snippets(text, list(document.get("summary_keywords") or []), limit=5), limit=3)
+    if snippets:
+        return "；".join(snippets[:3])
+    return str(document.get("policy_key") or "政策摘要待补充")
 
 
 def _rule_message(document: dict[str, object], rule: dict[str, object], text: str) -> str:
-    snippets = _pick_snippets(text, list(rule.get("keywords") or []), limit=2)
+    default_message = _normalize_text(str(rule.get("default_message") or ""))
+    if default_message:
+        return default_message
+    snippets = _clean_snippets(_pick_snippets(text, list(rule.get("keywords") or []), limit=4), limit=2)
     if snippets:
         return "；".join(snippets[:2])
-    return str(rule.get("default_message") or _summary_from_doc(document, text))
+    return _summary_from_doc(document, text)
 
 
 def _find_matching_institutions(province: str, keywords: list[str]) -> list[dict[str, object]]:
@@ -503,6 +748,7 @@ def _build_policy_row(document: dict[str, object], path: Path, text: str, matche
 def _build_risk_rows(document: dict[str, object], path: Path, text: str) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for rule in document.get("risk_rules", []):
+        source_excerpt = _clean_snippets(_pick_snippets(text, list(rule.get("keywords") or []), limit=4), limit=2)
         rows.append(
             {
                 "exam_year": document["exam_year"],
@@ -517,6 +763,8 @@ def _build_risk_rows(document: dict[str, object], path: Path, text: str) -> list
                 "display_label": rule.get("display_label"),
                 "source_url": str(path),
                 "policy_key": document["policy_key"],
+                "policy_topic": path.stem,
+                "source_excerpt": source_excerpt,
             }
         )
     return rows
@@ -551,6 +799,8 @@ def _build_institution_rule_rows(
                 "source_url": str(path),
                 "notes": f"基于 {path.name} 自动归纳的章程级风险摘要。",
                 "policy_key": document["policy_key"],
+                "policy_topic": path.stem,
+                "source_excerpt": _clean_snippets(_pick_snippets(text, list(config.get("keywords") or []), limit=4), limit=2),
             }
         )
     return rows

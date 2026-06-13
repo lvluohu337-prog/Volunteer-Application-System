@@ -19,6 +19,14 @@ const saving = ref(false);
 const deriving = ref(false);
 const template = ref({
   provinces: [],
+  province_support: {
+    formalSupportedProvinces: [],
+    formalSupportedLabel: "",
+    pendingProvinces: [],
+    options: [],
+    notice: "",
+    lastVerifiedDate: ""
+  },
   exam_types: [],
   genders: [],
   status_options: [],
@@ -151,6 +159,13 @@ onMounted(() => {
         <el-card shadow="never" class="panel-card notice-card">
           <strong>字段边界说明</strong>
           <p>正式推荐与正式报告默认只使用正式高考成绩、全省位次、选科组合、批次和招生规则。前六段、八字、星座、性格、兴趣与发展目标只用于专业方向解释和家长沟通。</p>
+          <el-alert
+            type="warning"
+            :closable="false"
+            class="province-support-alert"
+            :title="template.province_support?.notice || '当前正式支持省份待补充。'"
+            :description="`本次核验时间：${template.province_support?.lastVerifiedDate || '待补充'}。待核验省份：${template.province_support?.pendingProvinces?.join(' / ') || '暂无'}`"
+          />
         </el-card>
 
         <el-form :model="form" label-position="top" class="intake-form">
@@ -168,8 +183,15 @@ onMounted(() => {
                 </el-form-item>
                 <el-form-item label="省份">
                   <el-select v-model="form.province" placeholder="请选择">
-                    <el-option v-for="item in template.provinces" :key="item" :label="item" :value="item" />
+                    <el-option
+                      v-for="item in template.province_support?.options?.length ? template.province_support.options : template.provinces.map((province) => ({ value: province, label: province, disabled: false }))"
+                      :key="item.value || item"
+                      :label="item.label || item"
+                      :value="item.value || item"
+                      :disabled="item.disabled"
+                    />
                   </el-select>
+                  <p class="table-note">当前只有正式支持省份可新建正式学生档案；其它省份先保留为待核验范围。</p>
                 </el-form-item>
                 <el-form-item label="考试类型">
                   <el-select v-model="form.exam_type" placeholder="请选择">

@@ -6,17 +6,12 @@ $frontendScript = Join-Path $projectRoot "backend\scripts\start_frontend.ps1"
 $pgScript = Join-Path $projectRoot "backend\scripts\start_local_postgres.ps1"
 
 # -------------------------------------------------------------------
-# 1. Start PostgreSQL (optional, background, non-blocking)
+# 1. Start PostgreSQL and wait until it is actually ready
 # -------------------------------------------------------------------
 if (Test-Path $pgScript) {
-    Write-Host "[PG] Starting PostgreSQL in background..." -ForegroundColor Cyan
-    Start-Process powershell.exe -ArgumentList @(
-        "-NoProfile",
-        "-WindowStyle", "Hidden",
-        "-Command",
-        "& '$pgScript'"
-    ) -WindowStyle Hidden | Out-Null
-    Write-Host "[PG] PostgreSQL start requested (may take a few seconds)." -ForegroundColor Green
+    Write-Host "[PG] Starting PostgreSQL..." -ForegroundColor Cyan
+    & $pgScript
+    Write-Host "[PG] PostgreSQL is ready." -ForegroundColor Green
 } else {
     Write-Host "[PG] PostgreSQL script not found, skipping." -ForegroundColor DarkGray
 }

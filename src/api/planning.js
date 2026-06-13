@@ -18,9 +18,11 @@ import {
   normalizeReportProductCode
 } from "../constants/reportProducts.js";
 import { INTAKE_DISCLAIMER } from "../constants/compliance.js";
+import { buildProvinceSupportSummary, FORMAL_SUPPORTED_PROVINCES } from "../constants/provinceSupport.js";
 
 const intakeTemplateFallback = {
-  provinces: ["河南", "河北", "山东", "江苏", "安徽"],
+  provinces: FORMAL_SUPPORTED_PROVINCES,
+  province_support: buildProvinceSupportSummary(),
   exam_types: [
     { value: "gaokao", label: "高考" },
     { value: "zhongkao", label: "中考" }
