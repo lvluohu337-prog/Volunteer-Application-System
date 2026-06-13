@@ -68,6 +68,35 @@ class InstitutionRuleParserTest(unittest.TestCase):
         self.assertEqual(special_rows[0]["policy_key"], "henan_2025_special_plan")
         self.assertEqual(special_rows[0]["policy_topic"], "special_plan")
 
+    def test_extracts_new_rule_types_for_tuition_campus_and_pathway(self) -> None:
+        rows = build_institution_rule_rows(
+            [
+                {
+                    "简章名称": "测试大学",
+                    "时间": "测试大学2021年招生章程",
+                    "内容_2": (
+                        "会计学专业学费为每学年56000元，住宿费按学校标准执行。"
+                        "办学地点为良乡校区。"
+                        "计算机类按大类招生，第二学年分流至计算机科学与技术、数据科学与大数据技术。"
+                        "拔尖班学生成绩优秀者可获得推荐免试攻读研究生资格。"
+                        "航海技术专业不宜女生报考。"
+                        "数学单科成绩不得低于110分。"
+                    ),
+                }
+            ],
+            source_path="charter.xlsx",
+        )
+        by_type = {row["rule_type"]: row for row in rows}
+
+        self.assertIn("tuition_requirement", by_type)
+        self.assertIn("campus_assignment", by_type)
+        self.assertIn("pilot_class_pathway", by_type)
+        self.assertIn("graduate_recommendation", by_type)
+        self.assertIn("gender_requirement", by_type)
+        self.assertIn("single_subject_requirement", by_type)
+        self.assertEqual(by_type["tuition_requirement"]["policy_key"], "henan_2026_general_regulation")
+        self.assertEqual(by_type["campus_assignment"]["policy_topic"], "campus_assignment")
+
 
 if __name__ == "__main__":
     unittest.main()

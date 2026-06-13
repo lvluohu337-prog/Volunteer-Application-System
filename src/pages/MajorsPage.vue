@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { fetchMajorsData } from "../api/planning.js";
 import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
+import RequestErrorNotice from "../components/RequestErrorNotice.vue";
 import StatusTag from "../components/StatusTag.vue";
 
 const route = useRoute();
@@ -30,6 +31,7 @@ const emptyPortraitRecommendation = {
 };
 
 const loading = ref(true);
+const loadError = ref("");
 const hasStudent = ref(false);
 const studentId = ref(null);
 const rows = ref([]);
@@ -120,16 +122,25 @@ function parseStudentId() {
 
 async function loadPageData() {
   loading.value = true;
-  const data = await fetchMajorsData(parseStudentId());
-  hasStudent.value = data.hasStudent ?? false;
-  studentId.value = data.studentId ?? null;
-  rows.value = data.rows ?? [];
-  disclaimer.value = data.disclaimer ?? "";
-  resultSource.value = data.resultSource ?? resultSource.value;
-  ruleSummary.value = data.ruleSummary ?? ruleSummary.value;
-  derivedProfile.value = data.derivedProfile ?? { ...emptyDerivedProfile };
-  portraitRecommendation.value = data.portraitRecommendation ?? { ...emptyPortraitRecommendation };
-  loading.value = false;
+  loadError.value = "";
+  try {
+    const data = await fetchMajorsData(parseStudentId());
+    hasStudent.value = data.hasStudent ?? false;
+    studentId.value = data.studentId ?? null;
+    rows.value = data.rows ?? [];
+    disclaimer.value = data.disclaimer ?? "";
+    resultSource.value = data.resultSource ?? resultSource.value;
+    ruleSummary.value = data.ruleSummary ?? ruleSummary.value;
+    derivedProfile.value = data.derivedProfile ?? { ...emptyDerivedProfile };
+    portraitRecommendation.value = data.portraitRecommendation ?? { ...emptyPortraitRecommendation };
+  } catch (error) {
+    loadError.value = error.message || "专业推荐加载失败，请确认后端接口和学生数据状态后重试。";
+    hasStudent.value = false;
+    studentId.value = null;
+    rows.value = [];
+  } finally {
+    loading.value = false;
+  }
 }
 
 function goToPlan() {
@@ -178,6 +189,19 @@ onMounted(() => {
 
     <el-skeleton :loading="loading" animated :rows="10">
       <template #default>
+        <RequestErrorNotice
+          v-if="loadError"
+          title="专业推荐加载失败"
+          :message="loadError"
+          hint="在专业推荐接口恢复前，请不要把当前方向建议当成正式结论，也不要直接继续生成志愿方案。"
+        >
+          <template #actions>
+            <el-button @click="goToStudentDetail">查看学生详情</el-button>
+            <el-button type="primary" @click="loadPageData">重新加载</el-button>
+          </template>
+        </RequestErrorNotice>
+
+        <template v-else>
         <el-card v-if="hasStudent" shadow="never" class="panel-card result-source-banner">
           <div class="result-source-head">
             <div>
@@ -390,6 +414,7 @@ onMounted(() => {
           <strong>合规说明</strong>
           <p>{{ portraitRecommendation.disclaimer || disclaimer }}</p>
         </el-card>
+        </template>
       </template>
     </el-skeleton>
   </section>

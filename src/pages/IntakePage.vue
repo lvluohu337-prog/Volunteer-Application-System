@@ -8,6 +8,7 @@ import {
   submitStudentIntake
 } from "../api/planning.js";
 import PageHeader from "../components/PageHeader.vue";
+import RequestErrorNotice from "../components/RequestErrorNotice.vue";
 import StatusTag from "../components/StatusTag.vue";
 
 const emit = defineEmits(["open-dialog"]);
@@ -17,6 +18,8 @@ const router = useRouter();
 const loading = ref(true);
 const saving = ref(false);
 const deriving = ref(false);
+const pageError = ref("");
+const deriveError = ref("");
 const template = ref({
   provinces: [],
   province_support: {
@@ -57,6 +60,7 @@ async function refreshDerivedProfile() {
   if (!form.value.birthday) {
     derivedProfile.value = null;
     lastDeriveKey.value = "";
+    deriveError.value = "";
     return;
   }
 
@@ -69,6 +73,7 @@ async function refreshDerivedProfile() {
   try {
     const result = await fetchIntakeDerivedProfile(form.value.birthday, form.value.birth_time || undefined);
     derivedProfile.value = result;
+    deriveError.value = "";
     lastDeriveKey.value = deriveKey;
     const autofill = result.autofill ?? {};
     form.value.constellation = autofill.constellation ?? form.value.constellation;
@@ -85,6 +90,8 @@ async function refreshDerivedProfile() {
     if (!form.value.development_goal) {
       form.value.development_goal = autofill.development_goal ?? "";
     }
+  } catch (error) {
+    deriveError.value = error.message || "画像辅助推导失败，请先手工填写相关字段。";
   } finally {
     deriving.value = false;
   }
@@ -92,20 +99,29 @@ async function refreshDerivedProfile() {
 
 async function loadPageData() {
   loading.value = true;
-  const templateData = await fetchIntakeData();
-  template.value = templateData;
-  form.value = { ...(templateData.defaults ?? {}) };
+  pageError.value = "";
+  deriveError.value = "";
+  try {
+    const templateData = await fetchIntakeData();
+    template.value = templateData;
+    form.value = { ...(templateData.defaults ?? {}) };
 
-  const studentId = parseStudentId();
-  if (studentId) {
-    const detail = await fetchStudentDetail(studentId);
-    form.value = { ...form.value, ...detail };
-  }
+    const studentId = parseStudentId();
+    if (studentId) {
+      const detail = await fetchStudentDetail(studentId);
+      form.value = { ...form.value, ...detail };
+    }
 
-  if (form.value.birthday) {
-    await refreshDerivedProfile();
+    if (form.value.birthday) {
+      await refreshDerivedProfile();
+    }
+  } catch (error) {
+    pageError.value = error.message || "学生录入模板加载失败，请确认后端接口和基础配置是否可用。";
+    derivedProfile.value = null;
+    form.value = {};
+  } finally {
+    loading.value = false;
   }
-  loading.value = false;
 }
 
 async function handleSubmit() {
@@ -115,6 +131,8 @@ async function handleSubmit() {
     const result = await submitStudentIntake(form.value, parseStudentId());
     emit("open-dialog", "学生档案已保存，正式成绩与画像辅助字段都已同步更新。");
     router.push({ name: "student-detail", params: { studentId: String(result.id) } });
+  } catch (error) {
+    emit("open-dialog", error.message || "学生档案保存失败，请检查必填字段和后端服务状态后重试。");
   } finally {
     saving.value = false;
   }
@@ -156,6 +174,19 @@ onMounted(() => {
 
     <el-skeleton :loading="loading" animated :rows="12">
       <template #default>
+        <RequestErrorNotice
+          v-if="pageError"
+          title="学生录入页加载失败"
+          :message="pageError"
+          hint="录入模板、学生详情或基础配置当前不可用，请先恢复后端接口，再继续正式建档。"
+        >
+          <template #actions>
+            <el-button @click="router.push({ name: 'students' })">返回学生列表</el-button>
+            <el-button type="primary" @click="loadPageData">重新加载</el-button>
+          </template>
+        </RequestErrorNotice>
+
+        <template v-else>
         <el-card shadow="never" class="panel-card notice-card">
           <strong>字段边界说明</strong>
           <p>正式推荐与正式报告默认只使用正式高考成绩、全省位次、选科组合、批次和招生规则。前六段、八字、星座、性格、兴趣与发展目标只用于专业方向解释和家长沟通。</p>
@@ -289,6 +320,15 @@ onMounted(() => {
                 <StatusTag :label="deriving ? '推导中' : '辅助字段'" :variant="deriving ? 'warning' : 'review'" />
               </div>
 
+              <el-alert
+                v-if="deriveError"
+                type="warning"
+                :closable="false"
+                class="derive-error-alert"
+                :title="deriveError"
+                description="当前不会再自动切回示例画像，请先手工补齐星座、方向偏好和沟通备注，再继续正式录入。"
+              />
+
               <div class="field-grid">
                 <el-form-item label="阳历出生日期">
                   <el-date-picker
@@ -384,6 +424,7 @@ onMounted(() => {
             <el-button type="primary" :loading="saving" @click="handleSubmit">保存学生档案</el-button>
           </div>
         </el-form>
+        </template>
       </template>
     </el-skeleton>
   </section>
@@ -392,6 +433,10 @@ onMounted(() => {
 <style scoped>
 .notice-card,
 .form-card {
+  margin-bottom: 16px;
+}
+
+.derive-error-alert {
   margin-bottom: 16px;
 }
 

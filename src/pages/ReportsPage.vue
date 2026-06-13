@@ -10,6 +10,7 @@ import {
 } from "../api/planning.js";
 import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
+import RequestErrorNotice from "../components/RequestErrorNotice.vue";
 import StatusTag from "../components/StatusTag.vue";
 import {
   COMPLIANCE_COPY_RULES,
@@ -79,6 +80,7 @@ const bucketDefinitions = [
 ];
 
 const loading = ref(true);
+const loadError = ref("");
 const hasStudent = ref(false);
 const studentId = ref(null);
 const activeProductCode = ref(DEFAULT_REPORT_PRODUCT_CODE);
@@ -345,32 +347,46 @@ function formatFileSize(value) {
 
 async function loadPageData() {
   loading.value = true;
-  const data = await fetchReportData(parseStudentId(), parseProductCode());
-  hasStudent.value = data.hasStudent ?? false;
-  studentId.value = data.studentId ?? null;
-  activeProductCode.value = data.activeProductCode ?? parseProductCode();
-  activeProductLabel.value = data.activeProductLabel ?? activeProductLabel.value;
-  reportProducts.value = data.reportProducts ?? [];
-  outline.value = data.outline ?? [];
-  sections.value = data.sections ?? [];
-  reportTitle.value = data.reportTitle ?? "";
-  reportSubtitle.value = data.reportSubtitle ?? "";
-  disclaimer.value = data.disclaimer || COMPLIANCE_DISCLAIMER;
-  boundaryNote.value = data.boundaryNote || "";
-  resultSource.value = data.resultSource ?? resultSource.value;
-  reportJson.value = data.reportJson ?? reportJson.value;
-  recommendationTable.value = data.recommendationTable ?? [];
-  firstChoice.value = data.firstChoice ?? null;
-  alternatives.value = data.alternatives ?? [];
-  notRecommended.value = data.notRecommended ?? [];
-  derivedProfile.value = data.derivedProfile ?? { ...emptyDerivedProfile };
-  portraitRecommendation.value = data.portraitRecommendation ?? { ...emptyPortraitRecommendation };
-  ruleSummary.value = data.ruleSummary ?? ruleSummary.value;
-  policyHighlights.value = data.policyHighlights ?? [];
-  advisorNotes.value = data.advisorNotes ?? [];
-  generationRecords.value = data.generationRecords ?? [];
-  deliveryRecords.value = data.deliveryRecords ?? [];
-  loading.value = false;
+  loadError.value = "";
+  try {
+    const data = await fetchReportData(parseStudentId(), parseProductCode());
+    hasStudent.value = data.hasStudent ?? false;
+    studentId.value = data.studentId ?? null;
+    activeProductCode.value = data.activeProductCode ?? parseProductCode();
+    activeProductLabel.value = data.activeProductLabel ?? activeProductLabel.value;
+    reportProducts.value = data.reportProducts ?? [];
+    outline.value = data.outline ?? [];
+    sections.value = data.sections ?? [];
+    reportTitle.value = data.reportTitle ?? "";
+    reportSubtitle.value = data.reportSubtitle ?? "";
+    disclaimer.value = data.disclaimer || COMPLIANCE_DISCLAIMER;
+    boundaryNote.value = data.boundaryNote || "";
+    resultSource.value = data.resultSource ?? resultSource.value;
+    reportJson.value = data.reportJson ?? reportJson.value;
+    recommendationTable.value = data.recommendationTable ?? [];
+    firstChoice.value = data.firstChoice ?? null;
+    alternatives.value = data.alternatives ?? [];
+    notRecommended.value = data.notRecommended ?? [];
+    derivedProfile.value = data.derivedProfile ?? { ...emptyDerivedProfile };
+    portraitRecommendation.value = data.portraitRecommendation ?? { ...emptyPortraitRecommendation };
+    ruleSummary.value = data.ruleSummary ?? ruleSummary.value;
+    policyHighlights.value = data.policyHighlights ?? [];
+    advisorNotes.value = data.advisorNotes ?? [];
+    generationRecords.value = data.generationRecords ?? [];
+    deliveryRecords.value = data.deliveryRecords ?? [];
+  } catch (error) {
+    loadError.value = error.message || "报告页面加载失败，请确认后端接口和学生数据状态后重试。";
+    hasStudent.value = false;
+    studentId.value = null;
+    recommendationTable.value = [];
+    firstChoice.value = null;
+    alternatives.value = [];
+    notRecommended.value = [];
+    sections.value = [];
+    deliveryRecords.value = [];
+  } finally {
+    loading.value = false;
+  }
 }
 
 function goToStudentDetail() {
@@ -463,6 +479,8 @@ async function runExport(format) {
       "open-dialog",
       `${format.toUpperCase()} 正式交付文件已生成并开始下载：${result.artifactName}\n系统已经同步写入导出留痕，可直接用于归档、发送和讲解交付。`
     );
+  } catch (error) {
+    emit("open-dialog", error.message || `${format.toUpperCase()} 导出失败，请确认报告接口和导出服务状态后重试。`);
   } finally {
     exporting.value = "";
   }
@@ -531,6 +549,19 @@ watch(
 
     <el-skeleton :loading="loading" animated :rows="10">
       <template #default>
+        <RequestErrorNotice
+          v-if="loadError"
+          title="报告页面加载失败"
+          :message="loadError"
+          hint="在报告接口恢复前，请不要把当前页面视为正式交付版本，也不要继续执行导出或下载。"
+        >
+          <template #actions>
+            <el-button @click="goToStudentDetail">查看学生详情</el-button>
+            <el-button type="primary" @click="loadPageData">重新加载</el-button>
+          </template>
+        </RequestErrorNotice>
+
+        <template v-else>
         <div v-if="hasStudent" class="report-layout">
           <el-card shadow="never" class="panel-card result-source-banner">
             <div class="result-source-head">
@@ -1176,6 +1207,7 @@ watch(
             <p>请先录入真实学生档案，再生成正式报告预览。</p>
           </div>
         </el-card>
+        </template>
       </template>
     </el-skeleton>
   </section>

@@ -24,6 +24,10 @@ POLICY_DOCUMENTS = [
         "province": "河南",
         "trend_type": "admission_regulation",
         "impact_scope": "all_candidates",
+        "summary_statements": [
+            "所有考生均须参加体检，高校可在通用规定基础上补充专业身体条件要求。",
+            "正式填报前需结合院校招生章程复核体检、单科、培养方式等补充限制。",
+        ],
         "summary_keywords": ["身体健康状况检查", "招生章程", "补充要求", "电子档案", "报名"],
         "rule_mode": "global_only",
         "risk_rules": [
@@ -170,6 +174,10 @@ POLICY_DOCUMENTS = [
         "province": "河南",
         "trend_type": "eligibility_rule",
         "impact_scope": "special_plan_candidates",
+        "summary_statements": [
+            "国家专项、高校专项、地方专项都以资格审核通过为前提，不能按普通志愿理解。",
+            "专项计划通常同时要求户籍、学籍、实际就读地等条件符合官方范围。",
+        ],
         "summary_keywords": ["专项计划", "报名资格审核", "资格审核"],
         "rule_mode": "global_only",
         "risk_rules": [
@@ -196,6 +204,10 @@ POLICY_DOCUMENTS = [
         "province": "河南",
         "trend_type": "special_talent_rule",
         "impact_scope": "high_level_sports_candidates",
+        "summary_statements": [
+            "高水平运动队属于特殊类型招生，需结合公布专业范围、专项资格和测试要求判断。",
+            "不能把高水平运动队志愿当作普通本科志愿替代项，文化课与专项条件都要同时满足。",
+        ],
         "summary_keywords": ["高水平运动队", "招生专业", "专项"],
         "rule_mode": "global_only",
         "risk_rules": [
@@ -294,6 +306,10 @@ POLICY_DOCUMENTS = [
         "province": "河南",
         "trend_type": "registration_rule",
         "impact_scope": "special_admission_candidates",
+        "summary_statements": [
+            "高招报名实行网上报名与现场确认结合，资格审核贯穿全流程。",
+            "单招、运动训练、保送等特殊类型招生只有在完成统一报名和资格审核后才具备报考基础。",
+        ],
         "summary_keywords": ["报名资格审核", "高职单招", "运动训练", "资格审核", "现场确认"],
         "rule_mode": "global_only",
         "risk_rules": [
@@ -320,6 +336,10 @@ POLICY_DOCUMENTS = [
         "province": "河南",
         "trend_type": "professional_exam_rule",
         "impact_scope": "sports_candidates",
+        "summary_statements": [
+            "体育类志愿需同时看专业测试、文化成绩和提前批投档规则，不能只按普通分数线判断。",
+            "体育类提前批志愿不得兼报同批次其他类别，正式方案要单独核算。",
+        ],
         "summary_keywords": ["体育类专业", "招生考试", "考试"],
         "rule_mode": "global_only",
         "risk_rules": [
@@ -360,6 +380,10 @@ POLICY_DOCUMENTS = [
         "province": "河南",
         "trend_type": "professional_exam_rule",
         "impact_scope": "arts_candidates",
+        "summary_statements": [
+            "艺术类招生按不同科类分别组织考试与投档，不能把一个类别的结果直接套到所有艺术志愿上。",
+            "艺术类志愿仍需同步满足报名、体检、文化课考试和对应专业类别要求。",
+        ],
         "summary_keywords": ["艺术类专业", "考试", "艺术类"],
         "rule_mode": "global_only",
         "risk_rules": [
@@ -400,6 +424,10 @@ POLICY_DOCUMENTS = [
         "province": "河南",
         "trend_type": "special_batch_rule",
         "impact_scope": "single_exam_candidates",
+        "summary_statements": [
+            "高职单招仅在获批高校范围内实施，且专业范围、考试方式和章程差异明显。",
+            "高职单招通常还要结合职业技能测试或职业适应性测试，不能按普通批多志愿逻辑理解。",
+        ],
         "summary_keywords": ["高职单招", "招生章程", "志愿填报", "职业技能测试", "免文化素质考试"],
         "rule_mode": "global_only",
         "risk_rules": [
@@ -454,6 +482,10 @@ POLICY_DOCUMENTS = [
         "province": "河南",
         "trend_type": "special_batch_rule",
         "impact_scope": "counterpart_candidates",
+        "summary_statements": [
+            "对口招生要求中职学籍、报名资格和专业对照关系同时成立，不能作为普通高考平替方案。",
+            "对口体育类、艺术类等专业还要结合专项考试与对应投档规则单独判断。",
+        ],
         "summary_keywords": ["对口招生", "报名资格审核", "专业对照", "体育类专业", "音乐与舞蹈类专业", "美术与设计类专业"],
         "rule_mode": "global_only",
         "risk_rules": [
@@ -514,6 +546,21 @@ POLICY_DOCUMENTS = [
                 "mitigation_suggestion": "逐项核对艺术类别、专项考试科目与分值，再判断该志愿是否还能保留在正式方案中。",
             },
         ],
+    },
+    {
+        "policy_key": "henan_2026_counterpart_faq",
+        "file_name": "河南省2026年普通高等学校对口招收中等职业学校毕业生工作相关事宜问答.docx",
+        "exam_year": 2026,
+        "province": "河南",
+        "trend_type": "registration_rule",
+        "impact_scope": "counterpart_candidates",
+        "summary_statements": [
+            "对口招生报名实行网上采集与现场确认结合，只有具备河南中职学籍的应届毕业生才能按要求报名。",
+            "对口志愿实行本科6个、专科12个平行院校志愿，并需同步复核体检、专业考试和资格条件申报。",
+        ],
+        "summary_keywords": ["对口招生", "网上信息采集", "现场确认", "资格条件申报", "平行志愿"],
+        "rule_mode": "global_only",
+        "risk_rules": [],
     },
 ]
 
@@ -681,6 +728,12 @@ def _build_trigger_text(trigger: dict[str, object] | None) -> str | None:
 
 
 def _summary_from_doc(document: dict[str, object], text: str) -> str:
+    preferred = _clean_snippets(
+        [str(item or "") for item in list(document.get("summary_statements") or [])],
+        limit=3,
+    )
+    if preferred:
+        return "；".join(preferred[:3])
     snippets = _clean_snippets(_pick_snippets(text, list(document.get("summary_keywords") or []), limit=5), limit=3)
     if snippets:
         return "；".join(snippets[:3])

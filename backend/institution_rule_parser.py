@@ -34,6 +34,19 @@ RULE_DEFINITIONS = [
         ],
     },
     {
+        "rule_type": "single_subject_requirement",
+        "rule_title": "单科成绩门槛",
+        "keywords": [
+            "单科成绩",
+            "语文成绩",
+            "数学成绩",
+            "外语成绩不得低于",
+            "英语成绩不得低于",
+            "单科不低于",
+            "口语成绩应不低于",
+        ],
+    },
+    {
         "rule_type": "adjustment_policy",
         "rule_title": "专业调剂与退档规则",
         "keywords": [
@@ -46,6 +59,30 @@ RULE_DEFINITIONS = [
         ],
     },
     {
+        "rule_type": "tuition_requirement",
+        "rule_title": "学费与收费标准提示",
+        "keywords": [
+            "学费",
+            "收费标准",
+            "住宿费",
+            "元/年",
+            "元／年",
+            "每学年",
+        ],
+    },
+    {
+        "rule_type": "campus_assignment",
+        "rule_title": "校区与办学地点安排",
+        "keywords": [
+            "办学地点",
+            "培养地点",
+            "校区",
+            "校本部",
+            "分校区",
+            "就读地点",
+        ],
+    },
+    {
         "rule_type": "cooperative_education",
         "rule_title": "中外合作办学与国际项目要求",
         "keywords": [
@@ -55,6 +92,34 @@ RULE_DEFINITIONS = [
             "双学位",
             "外培计划",
             "双培计划",
+        ],
+    },
+    {
+        "rule_type": "pilot_class_pathway",
+        "rule_title": "实验班与分流培养路径",
+        "keywords": [
+            "实验班",
+            "拔尖班",
+            "基地班",
+            "卓越班",
+            "大类招生",
+            "分流至",
+            "分流到",
+            "双学士",
+        ],
+    },
+    {
+        "rule_type": "graduate_recommendation",
+        "rule_title": "推免与深造通道说明",
+        "keywords": [
+            "推免",
+            "推荐免试",
+            "免试攻读",
+            "保研",
+            "直博",
+            "硕博连读",
+            "本硕",
+            "研究生推荐资格",
         ],
     },
     {
@@ -71,6 +136,18 @@ RULE_DEFINITIONS = [
             "飞行学员",
             "公安",
             "军队",
+        ],
+    },
+    {
+        "rule_type": "gender_requirement",
+        "rule_title": "性别与特殊报考限制",
+        "keywords": [
+            "不宜女生报考",
+            "不适宜女生报考",
+            "只招男生",
+            "只招女生",
+            "男女比例",
+            "女生慎报",
         ],
     },
     {
@@ -91,9 +168,15 @@ GENERAL_POLICY_KEY = "henan_2026_general_regulation"
 GENERAL_POLICY_TOPICS = {
     "language_requirement": "language_requirement",
     "physical_requirement": "physical_requirement",
+    "single_subject_requirement": "single_subject_requirement",
     "adjustment_policy": "adjustment_policy",
+    "tuition_requirement": "tuition_requirement",
+    "campus_assignment": "campus_assignment",
     "cooperative_education": "cooperative_education",
+    "pilot_class_pathway": "pilot_class_pathway",
+    "graduate_recommendation": "graduate_recommendation",
     "subject_selection_reference": "subject_selection_reference",
+    "gender_requirement": "gender_requirement",
     "special_program": "special_program",
 }
 

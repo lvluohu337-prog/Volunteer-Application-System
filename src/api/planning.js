@@ -17,152 +17,6 @@ import {
   getReportProductLabel,
   normalizeReportProductCode
 } from "../constants/reportProducts.js";
-import { INTAKE_DISCLAIMER } from "../constants/compliance.js";
-import { buildProvinceSupportSummary, FORMAL_SUPPORTED_PROVINCES } from "../constants/provinceSupport.js";
-
-const intakeTemplateFallback = {
-  provinces: FORMAL_SUPPORTED_PROVINCES,
-  province_support: buildProvinceSupportSummary(),
-  exam_types: [
-    { value: "gaokao", label: "高考" },
-    { value: "zhongkao", label: "中考" }
-  ],
-  genders: ["男", "女"],
-  status_options: [
-    { value: "draft", label: "草稿" },
-    { value: "review_pending", label: "待复核" },
-    { value: "reviewed", label: "已复核" }
-  ],
-  score_types: [
-    { value: "manual", label: "手工录入" },
-    { value: "mock", label: "模拟成绩" },
-    { value: "official", label: "正式成绩" }
-  ],
-  admission_batches: ["本科提前批", "本科批", "专科批", "综合评价", "待定"],
-  interest_options: ["计算机", "医学", "师范", "财经", "法学", "电子信息", "机械自动化", "设计传媒"],
-  school_preference_options: ["院校层次优先", "城市平台优先", "省内院校优先", "985 / 211 优先", "公办本科优先"],
-  region_preference_options: ["本省优先", "外省优先", "北方", "南方", "一线城市", "省会城市", "离家近"],
-  family_preference_options: ["稳定就业", "考公考编", "赚钱发展", "名校优先", "离家近", "读研深造"],
-  development_goal_options: ["就业优先", "考研深造", "考公考编", "技术研发", "医学发展", "综合待定"],
-  acceptance_options: [
-    { value: "accept", label: "接受" },
-    { value: "reject", label: "不接受" },
-    { value: "discuss", label: "可单独沟通" }
-  ],
-  score_source_options: ["一模", "二模", "三模", "平时估分", "正式成绩"],
-  subject_groups: {
-    gaokao: ["物理类", "历史类", "物化生", "物化地", "史政地"],
-    zhongkao: ["中考统招", "指标生", "特长方向"]
-  },
-  defaults: {
-    name: "",
-    gender: "",
-    birthday: "",
-    birth_time: "",
-    constellation: "",
-    bazi_year_pillar: "",
-    bazi_month_pillar: "",
-    bazi_day_pillar: "",
-    bazi_hour_pillar: "",
-    exam_type: "gaokao",
-    province: "",
-    city: "",
-    district: "",
-    school: "",
-    phone: "",
-    parent_phone: "",
-    exam_year: 2026,
-    admission_batch: "",
-    subject_group: "",
-    target_direction: "",
-    interest_preferences: "",
-    school_preference: "",
-    region_preference: "",
-    family_preferences: "",
-    parent_focus: "",
-    development_goal: "",
-    accept_adjustment: "discuss",
-    accept_high_fee_programs: "reject",
-    communication_notes: "",
-    status: "draft",
-    remark: "",
-    mock_score: null,
-    estimated_score: null,
-    final_score: null,
-    estimated_rank: null,
-    final_rank: null,
-    score_type: "manual",
-    chinese: null,
-    math: null,
-    english: null,
-    physics: null,
-    chemistry: null,
-    biology: null,
-    politics: null,
-    history: null,
-    geography: null,
-    pe: null,
-    experiment: null,
-    info_tech: null,
-    rank: null
-  },
-  birth_time_options: [
-    { value: "23:30", label: "子时 23:00-00:59" },
-    { value: "01:30", label: "丑时 01:00-02:59" },
-    { value: "03:30", label: "寅时 03:00-04:59" },
-    { value: "05:30", label: "卯时 05:00-06:59" },
-    { value: "07:30", label: "辰时 07:00-08:59" },
-    { value: "09:30", label: "巳时 09:00-10:59" },
-    { value: "11:30", label: "午时 11:00-12:59" },
-    { value: "13:30", label: "未时 13:00-14:59" },
-    { value: "15:30", label: "申时 15:00-16:59" },
-    { value: "17:30", label: "酉时 17:00-18:59" },
-    { value: "19:30", label: "戌时 19:00-20:59" },
-    { value: "21:30", label: "亥时 21:00-22:59" }
-  ],
-  birthday_notice: "请输入学生阳历生日与出生时辰，系统会自动辅助推算星座、八字四柱和兴趣倾向。",
-  disclaimer: INTAKE_DISCLAIMER
-};
-
-const derivedProfileFallback = {
-  birthdayType: "公历",
-  birthTime: "09:30",
-  constellation: "双子座",
-  pillars: {
-    year: "甲辰",
-    month: "己巳",
-    day: "壬午",
-    hour: "乙巳"
-  },
-  hourBranchLabel: "巳时(09:00-10:59)",
-  wuxing: {
-    counts: { 木: 1, 火: 2, 土: 1, 金: 0, 水: 2 },
-    dominant: "火",
-    secondary: "水"
-  },
-  profile: {
-    personalityTraits: ["行动力强", "表达欲强", "学习快", "信息处理快"],
-    learningStyle: ["更适合目标清晰、反馈频繁的训练"],
-    interestDirections: ["电子信息", "传媒", "计算机", "数据方向"],
-    regionPreferences: ["南方", "节奏较快城市", "创新资源密集区域"],
-    developmentGoals: ["技术研发", "快速成长", "跨领域创新"],
-    explanations: [
-      "系统按阳历生日自动推算星座与前六字。",
-      "兴趣和区域建议仅作辅助参考。"
-    ]
-  },
-  autofill: {
-    constellation: "双子座",
-    bazi_year_pillar: "甲辰",
-    bazi_month_pillar: "己巳",
-    bazi_day_pillar: "壬午",
-    bazi_hour_pillar: "乙巳",
-    interest_preferences: "电子信息、传媒、计算机、数据方向",
-    region_preference: "南方、节奏较快城市、创新资源密集区域",
-    development_goal: "技术研发、快速成长、跨领域创新"
-  },
-  disclaimer: "前六字、星座和五行倾向仅作为辅助分析，不替代真实招生数据和正式填报规则。"
-};
 
 const emptyStudentDrivenState = Object.freeze({
   hasStudent: false,
@@ -244,16 +98,14 @@ export async function deleteStudentScoreRecord(scoreId) {
 
 export async function fetchIntakeData() {
   return apiRequest(API_ENDPOINTS.intake.template.path, {
-    method: API_ENDPOINTS.intake.template.method,
-    mockData: intakeTemplateFallback
+    method: API_ENDPOINTS.intake.template.method
   });
 }
 
 export async function fetchIntakeDerivedProfile(birthday, birthTime) {
   return apiRequest(API_ENDPOINTS.intake.deriveProfile.path, {
     method: API_ENDPOINTS.intake.deriveProfile.method,
-    query: { birthday, birth_time: birthTime },
-    mockData: derivedProfileFallback
+    query: { birthday, birth_time: birthTime }
   });
 }
 

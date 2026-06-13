@@ -2,7 +2,7 @@
 
 ## 1. 当前测试范围
 
-当前仓库还没有独立的 `backend/tests` 或前端自动化测试目录，因此本文件主要覆盖：
+当前仓库已经有 `backend/tests`，并新增了一条最小前端错误态回归脚本，因此本文件主要覆盖：
 
 - 环境准备
 - 数据导入验证
@@ -344,6 +344,33 @@ Invoke-RestMethod `
 - demo 页面仍能基于样例学生生成 99/399 演示报告
 - 设置页能正常加载后端返回内容
 
+### 7.5 前端断接口错误态回归
+
+执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test_frontend_error_states.ps1
+```
+
+或：
+
+```bash
+npm run test:frontend:error-states
+```
+
+这条回归会自动：
+
+- 先执行一次 `vite build`
+- 用构建产物启动本地静态站点
+- 对 `/api` 请求统一返回 `503`
+- 校验 `intake / analysis / majors / plan / reports` 五个页面都显示正式错误卡片
+
+检查点：
+
+- 错误标题命中预期页面
+- 主文案统一为“后端服务暂时不可用，请稍后重试。”
+- 风险提示文案和操作按钮不回退为旧 demo / mock 表现
+
 ---
 
 ## 8. 构建检查
@@ -373,7 +400,7 @@ npm run build
 
 当前仍未覆盖的质量空白：
 
-- 没有正式的自动化测试目录
+- 还没有完整的前端组件单测框架
 - 没有导入回归测试
 - 没有规则引擎断言测试
 - 没有最终版 PDF/Word 渲染验收流程

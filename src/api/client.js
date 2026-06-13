@@ -1,5 +1,4 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
-const USE_MOCK = import.meta.env.VITE_USE_MOCK !== "false";
 
 function normalizeQuery(query = {}) {
   return Object.fromEntries(
@@ -89,9 +88,40 @@ function resolveResponsePayload(payload, unwrapData = true) {
   return payload;
 }
 
+async function buildHttpError(response) {
+  let message =
+    response.status >= 500
+      ? "后端服务暂时不可用，请稍后重试。"
+      : `请求失败（状态码 ${response.status}）。`;
+
+  try {
+    const contentType = response.headers.get("Content-Type") || "";
+    if (contentType.includes("application/json")) {
+      const payload = await response.json();
+      const resolvedMessage =
+        payload?.message ||
+        payload?.detail ||
+        payload?.error ||
+        payload?.data?.message ||
+        payload?.data?.detail;
+      if (resolvedMessage) {
+        message = String(resolvedMessage);
+      }
+    } else if (response.status < 500) {
+      const text = (await response.text()).trim();
+      if (text) {
+        message = text;
+      }
+    }
+  } catch {
+    // Keep the fallback HTTP status message.
+  }
+
+  return new Error(message);
+}
+
 export async function apiRequest(path, options = {}) {
   const {
-    mockData,
     transform,
     query,
     body,
@@ -99,10 +129,6 @@ export async function apiRequest(path, options = {}) {
     unwrapData = true,
     ...fetchOptions
   } = options;
-
-  if (!API_BASE_URL && USE_MOCK && mockData !== undefined) {
-    return typeof transform === "function" ? transform(mockData) : mockData;
-  }
 
   try {
     const response = await fetch(buildUrl(path, query), {
@@ -116,18 +142,20 @@ export async function apiRequest(path, options = {}) {
     });
 
     if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
+      throw await buildHttpError(response);
     }
 
     const payload = await response.json();
     const resolvedData = resolveResponsePayload(payload, unwrapData);
     return typeof transform === "function" ? transform(resolvedData) : resolvedData;
   } catch (error) {
-    if (USE_MOCK && mockData !== undefined) {
-      return typeof transform === "function" ? transform(mockData) : mockData;
+    if (error instanceof TypeError) {
+      throw new Error("后端接口当前不可达，请确认服务是否已启动后重试。");
     }
-
-    throw error;
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error("请求失败，请检查网络或稍后重试。");
   }
 }
 
@@ -155,7 +183,7 @@ export async function downloadRequest(path, options = {}) {
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+    throw await buildHttpError(response);
   }
 
   const blob = await response.blob();
@@ -173,4 +201,4 @@ export async function downloadRequest(path, options = {}) {
   };
 }
 
-export { API_BASE_URL, USE_MOCK, buildQueryString, buildUrl, normalizeQuery };
+export { API_BASE_URL, buildQueryString, buildUrl, normalizeQuery };

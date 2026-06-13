@@ -318,7 +318,11 @@ def _clean_policy_summary(summary: str, *, max_sentences: int = 2) -> str:
     filtered: list[str] = []
     for fragment in fragments:
         fragment = re.sub(r"（[^）。；;]*$", "", fragment).strip(" ，；;。:：")
+        if re.match(r"^[一二三四五六七八九十]+、", fragment):
+            continue
         if fragment.startswith(("的说明和解释", "并在招生章程中", "以下简称", "以下简")):
+            continue
+        if "以下简" in fragment:
             continue
         if len(fragment) < 6 and not re.search(r"\d", fragment):
             continue
@@ -1583,6 +1587,8 @@ def _fallback_reason_text(student: dict[str, Any], context: dict[str, Any]) -> s
         return "当前选科/科类信息无法映射到已入库真实招生轨道。"
     if not context.get("latest_year"):
         return "当前省份或选科轨道尚未补齐可用于推荐的真实历史招生数据。"
+    if context.get("batch_requirement_met") is False and context.get("declared_batch"):
+        return f"当前分数尚未达到所选{context.get('declared_batch')}对应批次线，系统未命中真实招生候选。"
     return "当前分数、位次、选科或批次条件未命中已入库真实招生候选，系统已退回画像/规则结果。"
 
 
@@ -1764,10 +1770,13 @@ POLICY_SIGNAL_MAP = {
 
 STRICT_POLICY_SIGNAL_MAP = {
     "general_regulation": ("招生章程", "体检", "报名", "录取规则"),
+    "registration": ("报名", "资格审核", "现场确认", "单招", "运动训练", "保送"),
     "military": ("军队", "军校", "飞行", "飞行学员", "政治考核", "军检", "只招英语"),
     "sergeant": ("军士", "定向培养军士", "政治考核", "军检"),
+    "single_exam": ("单招", "高职单招", "职业技能测试", "职业适应性测试"),
     "special_plan": ("专项计划", "国家专项", "高校专项", "地方专项", "资格审核"),
     "high_level_sports": ("高水平运动队", "体育教育", "运动训练"),
+    "counterpart": ("对口", "中职", "中等职业学校", "专业对照", "美术与设计类", "音乐与舞蹈类"),
     "police": ("公安", "警察", "政治考察", "体能测评"),
     "tibet": ("西藏就业", "定向西藏", "西藏生源"),
     "sports": ("体育类", "体育教育", "社会体育", "运动训练"),

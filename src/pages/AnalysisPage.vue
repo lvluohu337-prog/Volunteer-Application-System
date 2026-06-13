@@ -5,6 +5,7 @@ import { fetchAnalysisData } from "../api/planning.js";
 import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
 import PanelSection from "../components/PanelSection.vue";
+import RequestErrorNotice from "../components/RequestErrorNotice.vue";
 import StatusTag from "../components/StatusTag.vue";
 
 const route = useRoute();
@@ -30,6 +31,7 @@ const emptyDerivedProfile = {
 };
 
 const loading = ref(true);
+const loadError = ref("");
 const hasStudent = ref(false);
 const studentId = ref(null);
 const summary = ref({ name: "", meta: "", tags: [] });
@@ -132,19 +134,33 @@ const fallbackNextSteps = [
 
 async function loadPageData() {
   loading.value = true;
-  const data = await fetchAnalysisData(routeStudentId.value);
-  hasStudent.value = data.hasStudent ?? false;
-  studentId.value = data.studentId ?? null;
-  summary.value = data.summary ?? { name: "", meta: "", tags: [] };
-  metrics.value = data.metrics ?? [];
-  buckets.value = data.buckets ?? [];
-  subjectBars.value = data.subjectBars ?? [];
-  warnings.value = data.warnings ?? [];
-  resultSource.value = data.resultSource ?? resultSource.value;
-  ruleSummary.value = data.ruleSummary ?? ruleSummary.value;
-  derivedProfile.value = data.derivedProfile ?? { ...emptyDerivedProfile };
-  policyHighlights.value = data.policyHighlights ?? [];
-  loading.value = false;
+  loadError.value = "";
+  try {
+    const data = await fetchAnalysisData(routeStudentId.value);
+    hasStudent.value = data.hasStudent ?? false;
+    studentId.value = data.studentId ?? null;
+    summary.value = data.summary ?? { name: "", meta: "", tags: [] };
+    metrics.value = data.metrics ?? [];
+    buckets.value = data.buckets ?? [];
+    subjectBars.value = data.subjectBars ?? [];
+    warnings.value = data.warnings ?? [];
+    resultSource.value = data.resultSource ?? resultSource.value;
+    ruleSummary.value = data.ruleSummary ?? ruleSummary.value;
+    derivedProfile.value = data.derivedProfile ?? { ...emptyDerivedProfile };
+    policyHighlights.value = data.policyHighlights ?? [];
+  } catch (error) {
+    loadError.value = error.message || "评估分析加载失败，请确认后端接口和学生数据状态后重试。";
+    hasStudent.value = false;
+    studentId.value = null;
+    summary.value = { name: "", meta: "", tags: [] };
+    metrics.value = [];
+    buckets.value = [];
+    subjectBars.value = [];
+    warnings.value = [];
+    policyHighlights.value = [];
+  } finally {
+    loading.value = false;
+  }
 }
 
 function goToPlan() {
@@ -193,6 +209,19 @@ onMounted(() => {
 
     <el-skeleton :loading="loading" animated :rows="8">
       <template #default>
+        <RequestErrorNotice
+          v-if="loadError"
+          title="评估分析加载失败"
+          :message="loadError"
+          hint="在分析接口恢复前，请不要把本页内容视为正式结果，也不要据此继续做正式志愿交付。"
+        >
+          <template #actions>
+            <el-button @click="goToStudentDetail">查看学生详情</el-button>
+            <el-button type="primary" @click="loadPageData">重新加载</el-button>
+          </template>
+        </RequestErrorNotice>
+
+        <template v-else>
         <el-card shadow="never" class="panel-card student-hero">
           <div class="student-hero-main">
             <h2>{{ summary.name }}</h2>
@@ -450,6 +479,7 @@ onMounted(() => {
             </ul>
           </PanelSection>
         </div>
+        </template>
       </template>
     </el-skeleton>
   </section>

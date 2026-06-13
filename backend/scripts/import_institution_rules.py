@@ -69,21 +69,33 @@ def main() -> None:
     rows = build_institution_rule_rows(records, source_path=str(workbook_path))
     _write_normalized_files(rows)
 
-    known_names = _institution_name_set()
     normalized_names = {str(row.get("institution_name") or "").strip() for row in rows}
-    matched_names = normalized_names & known_names
-    unmatched_names = sorted(name for name in normalized_names if name and name not in known_names)
+    if args.dry_run:
+        matched_names: set[str] = set()
+        unmatched_names = sorted(name for name in normalized_names if name)
+        coverage_summary = {
+            "normalized_institutions": len(normalized_names),
+            "matched_institutions": None,
+            "unmatched_institutions": len(unmatched_names),
+            "coverageMode": "dry_run_without_db",
+        }
+    else:
+        known_names = _institution_name_set()
+        matched_names = normalized_names & known_names
+        unmatched_names = sorted(name for name in normalized_names if name and name not in known_names)
+        coverage_summary = {
+            "normalized_institutions": len(normalized_names),
+            "matched_institutions": len(matched_names),
+            "unmatched_institutions": len(unmatched_names),
+            "coverageMode": "db_validated",
+        }
 
     summary = {
         "source_workbook": str(workbook_path),
         "normalized_count": len(rows),
         "rule_type_distribution": dict(sorted(Counter(row.get("rule_type") for row in rows).items())),
         "source_exam_year_distribution": dict(sorted(Counter(row.get("source_exam_year") for row in rows).items())),
-        "institution_name_coverage": {
-            "normalized_institutions": len(normalized_names),
-            "matched_institutions": len(matched_names),
-            "unmatched_institutions": len(unmatched_names),
-        },
+        "institution_name_coverage": coverage_summary,
         "unmatched_name_samples": unmatched_names[:100],
         "dry_run": args.dry_run,
     }

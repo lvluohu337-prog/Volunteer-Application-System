@@ -26,6 +26,12 @@ class PolicyHighlightsTest(unittest.TestCase):
         self.assertFalse(_policy_matches_signal_text("henan_2025_special_plan", plain_signal))
         self.assertTrue(_policy_matches_signal_text("henan_2025_special_plan", special_signal))
 
+    def test_counterpart_policy_requires_counterpart_signal(self) -> None:
+        plain_signal = "计算机 自动化 本科批 首选物理 再选化学"
+        counterpart_signal = "对口招生 中等职业学校毕业生 专业对照 美术与设计类"
+        self.assertFalse(_policy_matches_signal_text("henan_2026_counterpart_faq", plain_signal))
+        self.assertTrue(_policy_matches_signal_text("henan_2026_counterpart_faq", counterpart_signal))
+
     def test_general_regulation_always_retained(self) -> None:
         self.assertTrue(_policy_matches_signal_text("henan_2026_general_regulation", ""))
 
