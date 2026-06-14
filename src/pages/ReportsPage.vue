@@ -170,6 +170,10 @@ const hasStructuredRecommendations = computed(
   () => recommendationTable.value.length > 0 || Boolean(firstChoice.value)
 );
 
+const hasFormalReportResult = computed(
+  () => resultSource.value.mode !== "empty" && hasStructuredRecommendations.value
+);
+
 const resultSourceMeta = computed(() => {
   const mode = resultSource.value.mode;
   if (mode === "real") {
@@ -531,6 +535,7 @@ watch(
         <el-button @click="goToStudentDetail">查看学生详情</el-button>
         <el-button
           v-if="activeDeliveryChannels.includes('word')"
+          :disabled="!hasFormalReportResult"
           :loading="exporting === 'word'"
           @click="runExport('word')"
         >
@@ -539,6 +544,7 @@ watch(
         <el-button
           v-if="activeDeliveryChannels.includes('pdf')"
           type="primary"
+          :disabled="!hasFormalReportResult"
           :loading="exporting === 'pdf'"
           @click="runExport('pdf')"
         >
@@ -589,8 +595,15 @@ watch(
             </div>
           </el-card>
 
+          <el-card v-if="!hasFormalReportResult" shadow="never" class="panel-card">
+            <div class="empty-state">
+              <strong>当前学生暂无正式报告结果</strong>
+              <p>系统已识别到学生档案，但还没有形成可用于正式交付的推荐表与报告正文。请先回到前置链路补齐关键数据，再重新生成报告。</p>
+            </div>
+          </el-card>
+
           <FallbackRiskNotice
-            v-if="resultSource.mode === 'fallback'"
+            v-if="hasFormalReportResult && resultSource.mode === 'fallback'"
             :reason="resultSource.fallbackReason"
             :next-steps="fallbackNextSteps"
           >
@@ -600,6 +613,7 @@ watch(
             </template>
           </FallbackRiskNotice>
 
+          <template v-if="hasFormalReportResult">
           <el-card shadow="never" class="panel-card report-outline">
             <div class="product-head">
               <div>
@@ -1199,6 +1213,7 @@ watch(
               </article>
             </section>
           </el-card>
+          </template>
         </div>
 
         <el-card v-else shadow="never" class="panel-card">

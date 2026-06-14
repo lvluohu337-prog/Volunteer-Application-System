@@ -3,12 +3,14 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { fetchStudentDetail, fetchStudentScoreRecords } from "../api/planning.js";
 import PageHeader from "../components/PageHeader.vue";
+import RequestErrorNotice from "../components/RequestErrorNotice.vue";
 import StatusTag from "../components/StatusTag.vue";
 
 const route = useRoute();
 const router = useRouter();
 
 const loading = ref(true);
+const loadError = ref("");
 const student = ref(null);
 const scoreRecords = ref([]);
 
@@ -184,13 +186,25 @@ const flowSteps = computed(() => {
 
 const completedFlowCount = computed(() => flowSteps.value.filter((item) => item.statusLabel === "已完成" || item.statusLabel === "已就绪").length);
 
+function resetPageState() {
+  student.value = null;
+  scoreRecords.value = [];
+}
+
 async function loadPageData() {
   loading.value = true;
+  loadError.value = "";
   const studentId = Number(route.params.studentId);
-  student.value = await fetchStudentDetail(studentId);
-  const records = await fetchStudentScoreRecords(studentId);
-  scoreRecords.value = records.rows ?? [];
-  loading.value = false;
+  try {
+    student.value = await fetchStudentDetail(studentId);
+    const records = await fetchStudentScoreRecords(studentId);
+    scoreRecords.value = records.rows ?? [];
+  } catch (error) {
+    loadError.value = error.message || "学生工作台加载失败，请确认学生详情接口和成绩接口状态后重试。";
+    resetPageState();
+  } finally {
+    loading.value = false;
+  }
 }
 
 watch(
@@ -220,7 +234,19 @@ onMounted(() => {
 
     <el-skeleton :loading="loading" animated :rows="12">
       <template #default>
-        <template v-if="student">
+        <RequestErrorNotice
+          v-if="loadError"
+          title="学生工作台加载失败"
+          :message="loadError"
+          hint="在学生详情接口恢复前，请不要把当前页面视为正式进度依据，也不要继续执行专业推荐、志愿方案或报告导出。"
+        >
+          <template #actions>
+            <el-button @click="router.push({ name: 'students' })">返回学生列表</el-button>
+            <el-button type="primary" @click="loadPageData">重新加载</el-button>
+          </template>
+        </RequestErrorNotice>
+
+        <template v-else-if="student">
           <div class="summary-grid">
             <el-card shadow="never" class="panel-card summary-card">
               <h3>正式高考成绩</h3>
@@ -358,6 +384,13 @@ onMounted(() => {
             <p v-if="!scoreRecords.length" class="table-note">当前还没有录入历史估分或模拟成绩。</p>
           </el-card>
         </template>
+
+        <el-card v-else shadow="never" class="panel-card">
+          <div class="empty-state">
+            <strong>当前没有可展示的学生档案</strong>
+            <p>该学生可能尚未建立正式档案，或当前路由缺少有效学生编号。</p>
+          </div>
+        </el-card>
       </template>
     </el-skeleton>
   </section>

@@ -45,7 +45,7 @@
 - 学生工作台已经承接“录入 -> 画像 -> 专业 -> 方案 -> 报告 -> 导出”的流程引导。
 - `shared/province_support.json` 已成为正式支持省份的单一来源，当前正式支持范围明确为 `河南`。
 - `shared/report_products.json` 已成为产品档位单一来源，当前正式支持档位明确为 `99 / 399 / 999`，`699` 仅为 planned。
-- `Intake / Analysis / Majors / Plan / Reports` 五个主链路页面都已补上显式失败态，不再在接口失败时静默展示假数据。
+- `Students / Intake / Analysis / Majors / Plan / Reports` 已补上显式失败态；同时“接口失败”“暂无学生”“暂无正式结果”开始按不同页面语义拆分，不再继续静默混用。
 - 报告链路已具备结构化推荐表、导出留痕、正式下载接口和前端直接下载能力。
 - 河南真实库当前实查已达到：`institutions 5738`、`majors 99775`、`admission_plans 300696`、`institution_admission_scores 19020`、`major_admission_scores 173374`、`subject_requirements 60449`、`score_segments 12111`、`province_batches 142`、`institution_rules 10115`、`admission_risk_rules 24`、`policy_trends 13`。
 
@@ -55,7 +55,7 @@
 
 1. 系统级配置还没有正式落地入口，顾问署名、导出签名、合规文案等仍有页面级硬编码。
 2. 当前正式支持省份仍只有 `河南`；浙江、河北、山东、江苏、安徽、广东、四川仅处于“已核验待接入”。
-3. 主链路页面失败态已补齐，但 `DashboardPage.vue`、`StudentDetailPage.vue`、`BaseDataPage.vue` 仍缺统一的失败恢复体验。
+3. 主链路与辅助查看页已经完成一轮“接口失败 / 暂无学生 / 暂无正式结果”的边界拆分，但还需要在后续新增页面与交互里持续守住这套口径。
 4. 本地专业解释库、城市解释库、画像映射库和报告话术库还未系统化，399 档解释层价值仍偏弱。
 5. 仓库文档口径还没有完全同步，`README.md` 和部分历史 docs 仍保留旧数据量、旧页面引用和旧阶段描述。
 6. `699` 深度版能力仍未产品化，多方案对比、考研路径、就业迁移和人工复核入口都还未落地。
@@ -176,10 +176,10 @@
 
 #### 前端稳定性
 
-- [ ] 清理关键链路中的静默 mock 回退
-- [ ] 明确哪些前端空态属于“无学生/无结果”，哪些场景必须真实报错
-- [ ] 为 `src/pages/DashboardPage.vue`、`src/pages/StudentDetailPage.vue`、`src/pages/BaseDataPage.vue` 增加统一失败态和重试入口
-- [ ] 把“接口失败”和“暂无正式结果”在更多页面上彻底分离
+- [x] 清理关键链路中的静默 mock 回退
+- [x] 明确哪些前端空态属于“无学生/无结果”，哪些场景必须真实报错
+- [x] 为 `src/pages/DashboardPage.vue`、`src/pages/StudentDetailPage.vue`、`src/pages/BaseDataPage.vue` 增加统一失败态和重试入口
+- [x] 把“接口失败”和“暂无正式结果”在更多页面上彻底分离
 
 #### 系统级配置最小可用化
 
@@ -694,7 +694,7 @@ npm run test:frontend:error-states
 ### 当前真实风险
 
 1. 当前正式支持省份边界已经明确为 `河南`；其它目标省份虽然已核验素材，但还没有形成与河南同等级别的正式导入闭环。
-2. 主链路五个学生驱动页面已补显式错误态，但 `DashboardPage.vue`、`StudentDetailPage.vue`、`BaseDataPage.vue` 仍缺统一的失败恢复体验。
+2. 主链路和辅助查看页都已补显式错误态与主要空态拆分，但还需要继续防止未来新增页面重新出现“接口失败却静默显示空结果”的回退。
 3. 报告页里仍存在顾问信息与导出行为的页面级硬编码，例如默认 `author_name = 张老师`、导出默认 `includeSignature = true`，系统级配置尚未收口。
 4. 本地专业 / 城市 / 画像 / 话术解释库尚未建立，当前 399 元标准版的解释层说服力还有提升空间。
 5. `README.md` 与部分历史 docs 仍保留旧数据量、旧页面引用和旧阶段结论，和当前仓库现状不完全一致。

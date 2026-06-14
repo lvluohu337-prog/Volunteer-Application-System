@@ -105,6 +105,16 @@ const resultSourceFacts = computed(() => {
   return items;
 });
 
+const hasGeneratedMajorResult = computed(
+  () =>
+    resultSource.value.mode !== "empty" &&
+    Boolean(
+      rows.value.length ||
+        portraitRecommendation.value.majorFitReasons?.length ||
+        portraitRecommendation.value.recommendedMajorDirections?.length
+    )
+);
+
 const fallbackNextSteps = [
   "先在学生详情中核对最新成绩、位次、选科和家长诉求是否完整。",
   "把当前专业方向只作为沟通素材，不直接当作正式报考结论。",
@@ -228,8 +238,15 @@ onMounted(() => {
           </div>
         </el-card>
 
+        <el-card v-if="hasStudent && !hasGeneratedMajorResult" shadow="never" class="panel-card">
+          <div class="empty-state">
+            <strong>当前学生暂无正式专业推荐结果</strong>
+            <p>系统已经识别到学生档案，但还没有形成可用于正式报考判断的专业推荐。请先补齐关键成绩与选科边界后再重新生成。</p>
+          </div>
+        </el-card>
+
         <FallbackRiskNotice
-          v-if="hasStudent && resultSource.mode === 'fallback'"
+          v-if="hasStudent && hasGeneratedMajorResult && resultSource.mode === 'fallback'"
           :reason="resultSource.fallbackReason"
           :next-steps="fallbackNextSteps"
         >
@@ -239,7 +256,7 @@ onMounted(() => {
           </template>
         </FallbackRiskNotice>
 
-        <div v-if="hasStudent" class="summary-grid">
+        <div v-if="hasStudent && hasGeneratedMajorResult" class="summary-grid">
           <el-card shadow="never" class="panel-card summary-card">
             <h3>优先推荐方向</h3>
             <strong class="summary-value">{{ preferredDirection }}</strong>
@@ -261,7 +278,7 @@ onMounted(() => {
           </el-card>
         </div>
 
-        <div v-if="hasStudent" class="portrait-grid">
+        <div v-if="hasStudent && hasGeneratedMajorResult" class="portrait-grid">
           <el-card shadow="never" class="panel-card portrait-card">
             <div class="card-head">
               <div>
@@ -308,7 +325,7 @@ onMounted(() => {
           </el-card>
         </div>
 
-        <div v-if="hasStudent" class="reason-grid">
+        <div v-if="hasStudent && hasGeneratedMajorResult" class="reason-grid">
           <el-card
             v-for="item in portraitRecommendation.majorFitReasons"
             :key="item.direction"
@@ -340,7 +357,7 @@ onMounted(() => {
           </el-card>
         </div>
 
-        <el-card v-if="hasStudent" shadow="never" class="panel-card portrait-card">
+        <el-card v-if="hasStudent && hasGeneratedMajorResult" shadow="never" class="panel-card portrait-card">
           <div class="card-head">
             <div>
               <h2>与画像和家长诉求的匹配</h2>
@@ -365,7 +382,7 @@ onMounted(() => {
           </div>
         </el-card>
 
-        <el-card v-if="hasStudent && displayedRows.length" shadow="never" class="panel-card">
+        <el-card v-if="hasStudent && hasGeneratedMajorResult && displayedRows.length" shadow="never" class="panel-card">
           <div class="card-head">
             <div>
               <h2>真实招生样本专业</h2>

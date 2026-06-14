@@ -7,10 +7,31 @@ const DIST_DIR = path.resolve(__dirname, "..", "dist");
 const EXPECTED_ERROR_MESSAGE = "后端服务暂时不可用，请稍后重试。";
 const PAGES = [
   {
+    key: "dashboard",
+    route: "/dashboard",
+    title: "工作台加载失败",
+    hint: "在工作台接口恢复前，请不要把当前入口状态当成正式业务进度，也不要据此继续安排学生交付。",
+    actions: ["学生列表", "重新加载"]
+  },
+  {
+    key: "students",
+    route: "/students",
+    title: "学生列表加载失败",
+    hint: "在学生列表接口恢复前，请不要把当前学生总数、筛选结果或状态标签视为正式台账，也不要继续删除或进入后续交付流程。",
+    actions: ["录入新学生", "重新加载"]
+  },
+  {
     key: "intake",
     route: "/intake",
     title: "学生录入页加载失败",
     hint: "录入模板、学生详情或基础配置当前不可用，请先恢复后端接口，再继续正式建档。",
+    actions: ["返回学生列表", "重新加载"]
+  },
+  {
+    key: "student-detail",
+    route: "/students/1",
+    title: "学生工作台加载失败",
+    hint: "在学生详情接口恢复前，请不要把当前页面视为正式进度依据，也不要继续执行专业推荐、志愿方案或报告导出。",
     actions: ["返回学生列表", "重新加载"]
   },
   {
@@ -33,6 +54,13 @@ const PAGES = [
     title: "志愿方案加载失败",
     hint: "在方案接口恢复前，请不要把当前冲稳保结构用于正式填报，也不要直接继续生成正式报告。",
     actions: ["查看学生详情", "重新加载"]
+  },
+  {
+    key: "base-data",
+    route: "/base-data",
+    title: "基础数据加载失败",
+    hint: "在基础数据接口恢复前，请不要把本页表格视为正式底库快照，也不要据此判断导入是否已经成功。",
+    actions: ["返回工作台", "重新加载"]
   },
   {
     key: "reports",

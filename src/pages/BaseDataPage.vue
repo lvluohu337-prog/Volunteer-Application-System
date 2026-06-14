@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { ElMessage } from "element-plus";
+import { useRouter } from "vue-router";
 import PageHeader from "../components/PageHeader.vue";
 import PanelSection from "../components/PanelSection.vue";
+import RequestErrorNotice from "../components/RequestErrorNotice.vue";
 import {
   fetchFoundationCities,
   fetchFoundationMajors,
@@ -11,7 +12,10 @@ import {
 } from "../api/planning.js";
 import { COMPLIANCE_DISCLAIMER } from "../constants/compliance.js";
 
+const router = useRouter();
+
 const loading = ref(false);
+const loadError = ref("");
 const activeTab = ref("majors");
 const majorRows = ref([]);
 const cityRows = ref([]);
@@ -25,8 +29,16 @@ const summaryItems = computed(() => [
   { title: "模板字段", value: templateRows.value.length, note: "来自 Excel《报告模板字段》" }
 ]);
 
+function resetPageState() {
+  majorRows.value = [];
+  cityRows.value = [];
+  sampleStudentRows.value = [];
+  templateRows.value = [];
+}
+
 async function loadPageData() {
   loading.value = true;
+  loadError.value = "";
   try {
     const [majorsData, citiesData, studentsData, templatesData] = await Promise.all([
       fetchFoundationMajors(),
@@ -39,7 +51,8 @@ async function loadPageData() {
     sampleStudentRows.value = studentsData.rows ?? [];
     templateRows.value = templatesData.rows ?? [];
   } catch (error) {
-    ElMessage.error(error.message || "基础数据加载失败");
+    loadError.value = error.message || "基础数据加载失败，请确认基础数据接口和后端服务状态后重试。";
+    resetPageState();
   } finally {
     loading.value = false;
   }
@@ -60,6 +73,19 @@ onMounted(loadPageData);
       </template>
     </PageHeader>
 
+    <RequestErrorNotice
+      v-if="loadError"
+      title="基础数据加载失败"
+      :message="loadError"
+      hint="在基础数据接口恢复前，请不要把本页表格视为正式底库快照，也不要据此判断导入是否已经成功。"
+    >
+      <template #actions>
+        <el-button @click="router.push({ name: 'dashboard' })">返回工作台</el-button>
+        <el-button type="primary" @click="loadPageData">重新加载</el-button>
+      </template>
+    </RequestErrorNotice>
+
+    <template v-else>
     <div class="summary-grid">
       <el-card
         v-for="item in summaryItems"
@@ -136,5 +162,6 @@ onMounted(loadPageData);
         <p>{{ COMPLIANCE_DISCLAIMER }}</p>
       </div>
     </el-card>
+    </template>
   </section>
 </template>

@@ -3,12 +3,14 @@ import { computed, onMounted, ref } from "vue";
 import MetricCard from "../components/MetricCard.vue";
 import PageHeader from "../components/PageHeader.vue";
 import PanelSection from "../components/PanelSection.vue";
+import RequestErrorNotice from "../components/RequestErrorNotice.vue";
 import StatusTag from "../components/StatusTag.vue";
 import { fetchDashboardData } from "../api/planning.js";
 
 const emit = defineEmits(["navigate", "open-dialog"]);
 
 const loading = ref(true);
+const loadError = ref("");
 const metrics = ref([]);
 const students = ref([]);
 
@@ -30,12 +32,27 @@ const coreActions = computed(() => [
   }
 ]);
 
-onMounted(async () => {
-  const data = await fetchDashboardData();
-  metrics.value = data.metrics ?? [];
-  students.value = data.recentStudents ?? [];
-  loading.value = false;
-});
+function resetPageState() {
+  metrics.value = [];
+  students.value = [];
+}
+
+async function loadPageData() {
+  loading.value = true;
+  loadError.value = "";
+  try {
+    const data = await fetchDashboardData();
+    metrics.value = data.metrics ?? [];
+    students.value = data.recentStudents ?? [];
+  } catch (error) {
+    loadError.value = error.message || "工作台加载失败，请确认后端接口状态后重试。";
+    resetPageState();
+  } finally {
+    loading.value = false;
+  }
+}
+
+onMounted(loadPageData);
 </script>
 
 <template>
@@ -60,6 +77,19 @@ onMounted(async () => {
       </template>
 
       <template #default>
+        <RequestErrorNotice
+          v-if="loadError"
+          title="工作台加载失败"
+          :message="loadError"
+          hint="在工作台接口恢复前，请不要把当前入口状态当成正式业务进度，也不要据此继续安排学生交付。"
+        >
+          <template #actions>
+            <el-button @click="emit('navigate', 'students')">学生列表</el-button>
+            <el-button type="primary" @click="loadPageData">重新加载</el-button>
+          </template>
+        </RequestErrorNotice>
+
+        <template v-else>
         <div class="metrics-grid">
           <MetricCard
             v-for="metric in metrics"
@@ -122,9 +152,14 @@ onMounted(async () => {
                 </div>
                 <StatusTag :label="student.tagLabel" :variant="student.tag" />
               </div>
+              <div v-if="!students.length" class="empty-state">
+                <strong>当前还没有最近学生</strong>
+                <p>请先新增正式学生档案，或从学生列表继续处理已有学生。</p>
+              </div>
             </div>
           </PanelSection>
         </div>
+        </template>
       </template>
     </el-skeleton>
   </section>

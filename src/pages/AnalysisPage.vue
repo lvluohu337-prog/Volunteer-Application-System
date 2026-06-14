@@ -126,6 +126,18 @@ const resultSourceFacts = computed(() => {
   return items;
 });
 
+const hasGeneratedAnalysisResult = computed(
+  () =>
+    resultSource.value.mode !== "empty" &&
+    Boolean(
+      metrics.value.length ||
+        buckets.value.length ||
+        subjectBars.value.length ||
+        warnings.value.length ||
+        policyHighlights.value.length
+    )
+);
+
 const fallbackNextSteps = [
   "先回到学生详情，补齐最新总分、位次和选科组合。",
   "复核目标省份、院校层次和专业范围，必要时适当放宽筛选边界。",
@@ -222,7 +234,7 @@ onMounted(() => {
         </RequestErrorNotice>
 
         <template v-else>
-        <el-card shadow="never" class="panel-card student-hero">
+        <el-card v-if="hasStudent" shadow="never" class="panel-card student-hero">
           <div class="student-hero-main">
             <h2>{{ summary.name }}</h2>
             <p>{{ summary.meta }}</p>
@@ -234,6 +246,13 @@ onMounted(() => {
               :label="tag.label"
               :variant="tag.variant"
             />
+          </div>
+        </el-card>
+
+        <el-card v-else shadow="never" class="panel-card">
+          <div class="empty-state">
+            <strong>暂无可分析学生</strong>
+            <p>请先录入真实学生档案，并补充分数、位次和选科信息后再进入分析页。</p>
           </div>
         </el-card>
 
@@ -263,8 +282,15 @@ onMounted(() => {
           </div>
         </el-card>
 
+        <el-card v-if="hasStudent && !hasGeneratedAnalysisResult" shadow="never" class="panel-card">
+          <div class="empty-state">
+            <strong>当前学生暂无正式分析结果</strong>
+            <p>系统已识别到学生档案，但还没有生成可用于正式判断的分析输出。请先补齐成绩、位次、选科和目标边界后再重新生成。</p>
+          </div>
+        </el-card>
+
         <FallbackRiskNotice
-          v-if="hasStudent && resultSource.mode === 'fallback'"
+          v-if="hasStudent && hasGeneratedAnalysisResult && resultSource.mode === 'fallback'"
           :reason="resultSource.fallbackReason"
           :next-steps="fallbackNextSteps"
         >
@@ -274,7 +300,7 @@ onMounted(() => {
           </template>
         </FallbackRiskNotice>
 
-        <div v-if="hasStudent" class="content-grid content-grid-analysis">
+        <div v-if="hasStudent && hasGeneratedAnalysisResult" class="content-grid content-grid-analysis">
           <el-card
             v-for="item in metrics"
             :key="item.title"
@@ -287,7 +313,7 @@ onMounted(() => {
           </el-card>
         </div>
 
-        <div v-if="hasStudent" class="tri-column">
+        <div v-if="hasStudent && hasGeneratedAnalysisResult" class="tri-column">
           <el-card
             v-for="bucket in buckets"
             :key="bucket.key"
@@ -309,7 +335,7 @@ onMounted(() => {
           </el-card>
         </div>
 
-        <div class="content-grid content-grid-analysis">
+        <div v-if="hasStudent && hasGeneratedAnalysisResult" class="content-grid content-grid-analysis">
           <PanelSection
             title="规则判断"
             description="当前结果来自第一阶段规则引擎，已综合分数层级、位次完整度、选科匹配和冲稳保比例。"
@@ -427,7 +453,7 @@ onMounted(() => {
             title="学科对比"
             description="使用当前学生档案中的成绩快照做结构化展示。"
           >
-            <div v-if="hasStudent" class="chart-bars">
+            <div class="chart-bars">
               <div
                 v-for="item in subjectBars"
                 :key="item.label"
@@ -439,10 +465,6 @@ onMounted(() => {
                 </div>
                 <strong>{{ item.value }}</strong>
               </div>
-            </div>
-            <div v-else class="empty-state">
-              <strong>暂无可分析学生</strong>
-              <p>请先录入真实学生档案，并补充分数与位次信息。</p>
             </div>
           </PanelSection>
 

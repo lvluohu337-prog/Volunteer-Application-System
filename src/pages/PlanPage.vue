@@ -89,6 +89,12 @@ const resultSourceFacts = computed(() => {
   return items;
 });
 
+const hasGeneratedPlanResult = computed(
+  () =>
+    resultSource.value.mode !== "empty" &&
+    columns.value.some((column) => Array.isArray(column.cards) && column.cards.length > 0)
+);
+
 const fallbackNextSteps = [
   "先回到学生详情，补齐最新成绩、位次、选科和调剂接受边界。",
   "在命中真实候选前，不要直接把当前冲稳保方案用于正式填报或对外承诺。",
@@ -219,8 +225,15 @@ onMounted(() => {
           </div>
         </el-card>
 
+        <el-card v-if="hasStudent && !hasGeneratedPlanResult" shadow="never" class="panel-card">
+          <div class="empty-state">
+            <strong>当前学生暂无正式志愿方案</strong>
+            <p>系统已识别到学生档案，但还没有生成可用于正式填报的冲稳保方案。请先补齐成绩、位次、选科与边界条件后再重新生成。</p>
+          </div>
+        </el-card>
+
         <FallbackRiskNotice
-          v-if="hasStudent && resultSource.mode === 'fallback'"
+          v-if="hasStudent && hasGeneratedPlanResult && resultSource.mode === 'fallback'"
           :reason="resultSource.fallbackReason"
           :next-steps="fallbackNextSteps"
         >
@@ -230,7 +243,7 @@ onMounted(() => {
           </template>
         </FallbackRiskNotice>
 
-        <div v-if="hasStudent" class="summary-grid">
+        <div v-if="hasStudent && hasGeneratedPlanResult" class="summary-grid">
           <el-card shadow="never" class="panel-card summary-card">
             <h3>冲稳保比例</h3>
             <strong class="summary-value">
@@ -256,7 +269,7 @@ onMounted(() => {
           </el-card>
         </div>
 
-        <el-card v-if="hasStudent" shadow="never" class="panel-card focus-card">
+        <el-card v-if="hasStudent && hasGeneratedPlanResult" shadow="never" class="panel-card focus-card">
           <div class="focus-head">
             <div>
               <h2>方案优先方向说明</h2>
@@ -270,7 +283,7 @@ onMounted(() => {
           <p class="focus-copy">{{ ruleSummary.preferredDirectionReason || "待补充画像辅助说明。" }}</p>
         </el-card>
 
-        <div v-if="hasStudent" class="plan-grid">
+        <div v-if="hasStudent && hasGeneratedPlanResult" class="plan-grid">
           <el-card
             v-for="column in columns"
             :key="column.title"

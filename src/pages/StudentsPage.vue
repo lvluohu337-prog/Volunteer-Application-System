@@ -3,11 +3,13 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { deleteStudent, fetchStudentsData } from "../api/planning.js";
 import PageHeader from "../components/PageHeader.vue";
+import RequestErrorNotice from "../components/RequestErrorNotice.vue";
 import StatusTag from "../components/StatusTag.vue";
 
 const router = useRouter();
 
 const loading = ref(true);
+const loadError = ref("");
 const filters = ref({
   keyword: "",
   province: "",
@@ -26,15 +28,28 @@ const filterOptions = ref({
 
 async function loadStudents() {
   loading.value = true;
-  const data = await fetchStudentsData(filters.value);
-  rows.value = data.rows ?? [];
-  total.value = data.total ?? 0;
-  filterOptions.value = {
-    provinces: data.provinces ?? [],
-    statuses: data.statuses ?? [],
-    exam_types: data.exam_types ?? []
-  };
-  loading.value = false;
+  loadError.value = "";
+  try {
+    const data = await fetchStudentsData(filters.value);
+    rows.value = data.rows ?? [];
+    total.value = data.total ?? 0;
+    filterOptions.value = {
+      provinces: data.provinces ?? [],
+      statuses: data.statuses ?? [],
+      exam_types: data.exam_types ?? []
+    };
+  } catch (error) {
+    loadError.value = error.message || "学生列表加载失败，请确认后端接口和学生台账数据状态后重试。";
+    rows.value = [];
+    total.value = 0;
+    filterOptions.value = {
+      provinces: [],
+      statuses: [],
+      exam_types: []
+    };
+  } finally {
+    loading.value = false;
+  }
 }
 
 function resetFilters() {
@@ -98,7 +113,19 @@ onMounted(() => {
       </div>
     </el-card>
 
-    <el-card shadow="never" class="panel-card">
+    <RequestErrorNotice
+      v-if="loadError"
+      title="学生列表加载失败"
+      :message="loadError"
+      hint="在学生列表接口恢复前，请不要把当前学生总数、筛选结果或状态标签视为正式台账，也不要继续删除或进入后续交付流程。"
+    >
+      <template #actions>
+        <el-button @click="router.push({ name: 'intake' })">录入新学生</el-button>
+        <el-button type="primary" @click="loadStudents">重新加载</el-button>
+      </template>
+    </RequestErrorNotice>
+
+    <el-card v-else shadow="never" class="panel-card">
       <div class="table-head">
         <div>
           <h2>学生档案</h2>
@@ -138,6 +165,11 @@ onMounted(() => {
           </template>
         </el-table-column>
       </el-table>
+
+      <div v-if="!loading && !rows.length" class="empty-state">
+        <strong>当前没有匹配的学生档案</strong>
+        <p>请先录入正式学生档案，或调整筛选条件后重新查看。</p>
+      </div>
     </el-card>
   </section>
 </template>
