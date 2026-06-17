@@ -11,7 +11,8 @@ import {
 import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
 import RequestErrorNotice from "../components/RequestErrorNotice.vue";
-import StatusTag from "../components/StatusTag.vue";
+import ReportOutlineCard from "../components/reports/ReportOutlineCard.vue";
+import ReportResultSourceBanner from "../components/reports/ReportResultSourceBanner.vue";
 import {
   COMPLIANCE_COPY_RULES,
   COMPLIANCE_DISCLAIMER,
@@ -561,31 +562,11 @@ watch(
 
         <template v-else>
         <div v-if="hasStudent" class="report-layout">
-          <el-card shadow="never" class="panel-card result-source-banner">
-            <div class="result-source-head">
-              <div>
-                <h3>{{ resultSourceMeta.title }}</h3>
-                <p>
-                  {{
-                    resultSource.notice ||
-                    resultSource.fallbackReason ||
-                    "正式交付前仍需结合官方位次、院校章程和招生计划复核。"
-                  }}
-                </p>
-              </div>
-              <StatusTag :label="resultSourceMeta.tagLabel" :variant="resultSourceMeta.tagVariant" />
-            </div>
-
-            <div v-if="resultSourceFacts.length" class="result-source-facts">
-              <span
-                v-for="item in resultSourceFacts"
-                :key="item"
-                class="result-source-fact"
-              >
-                {{ item }}
-              </span>
-            </div>
-          </el-card>
+          <ReportResultSourceBanner
+            :meta="resultSourceMeta"
+            :result-source="resultSource"
+            :facts="resultSourceFacts"
+          />
 
           <el-card v-if="!hasFormalReportResult" shadow="never" class="panel-card">
             <div class="empty-state">
@@ -606,48 +587,15 @@ watch(
           </FallbackRiskNotice>
 
           <template v-if="hasFormalReportResult">
-          <el-card shadow="never" class="panel-card report-outline">
-            <div class="product-head">
-              <div>
-                <h2>报告目录</h2>
-                <p class="table-note">{{ activeProductLabel }}</p>
-              </div>
-              <div class="product-switch">
-                <button
-                  v-for="item in reportProducts"
-                  :key="item.code"
-                  class="product-pill"
-                  :class="{ active: item.code === activeProductCode }"
-                  type="button"
-                  @click="switchProduct(item.code)"
-                >
-                  {{ item.code }} 元
-                </button>
-              </div>
-            </div>
-            <p class="table-note">
-              {{ ruleSummary.scoreLevel || "待补充分层判断" }}
-              / 冲 {{ ruleSummary.strategy?.rush_ratio || 0 }}%
-              / 稳 {{ ruleSummary.strategy?.steady_ratio || 0 }}%
-              / 保 {{ ruleSummary.strategy?.safe_ratio || 0 }}%
-            </p>
-            <el-alert
-              v-if="plannedProductNotice"
-              type="info"
-              :closable="false"
-              class="planned-product-alert"
-              :title="`当前正式支持 99 / 399 / 999。${plannedProductNotice}`"
-            />
-            <ul class="outline-list">
-              <li
-                v-for="(item, index) in displayOutline"
-                :key="item"
-                :class="{ active: index === 1 }"
-              >
-                {{ item }}
-              </li>
-            </ul>
-          </el-card>
+          <ReportOutlineCard
+            :active-product-code="activeProductCode"
+            :active-product-label="activeProductLabel"
+            :report-products="reportProducts"
+            :rule-summary="ruleSummary"
+            :planned-product-notice="plannedProductNotice"
+            :outline-items="displayOutline"
+            @switch-product="switchProduct"
+          />
 
           <el-card shadow="never" class="panel-card report-preview">
             <section v-if="reportProducts.length" class="product-catalog">
@@ -1221,51 +1169,6 @@ watch(
 </template>
 
 <style scoped>
-.result-source-banner {
-  gap: 14px;
-  margin-bottom: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background:
-    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 32%),
-    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.88));
-}
-
-.result-source-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.result-source-head h3 {
-  margin: 0 0 6px;
-  font-size: 16px;
-  color: var(--app-text-primary);
-}
-
-.result-source-head p {
-  margin: 0;
-  color: var(--app-text-secondary);
-  line-height: 1.7;
-}
-
-.result-source-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.result-source-fact {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.05);
-  color: var(--app-text-secondary);
-  font-size: 13px;
-}
-
 .trace-item-head {
   display: flex;
   align-items: center;
@@ -1278,35 +1181,6 @@ watch(
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-}
-
-.product-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.product-switch {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.product-pill {
-  border: 1px solid rgba(66, 133, 244, 0.16);
-  background: rgba(66, 133, 244, 0.06);
-  color: var(--app-text-secondary);
-  border-radius: 999px;
-  padding: 8px 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.product-pill.active {
-  background: linear-gradient(135deg, rgba(66, 133, 244, 0.18), rgba(66, 133, 244, 0.08));
-  color: var(--app-text-primary);
-  border-color: rgba(66, 133, 244, 0.3);
 }
 
 .product-catalog {
@@ -1706,10 +1580,6 @@ watch(
   line-height: 1.7;
 }
 
-.planned-product-alert {
-  margin-top: 12px;
-}
-
 @media (max-width: 1199px) {
   .first-choice-main {
     grid-template-columns: 1fr;
@@ -1717,11 +1587,9 @@ watch(
 }
 
 @media (max-width: 767px) {
-  .result-source-head,
   .section-head,
   .bucket-stat-head,
-  .decision-head,
-  .product-head {
+  .decision-head {
     flex-direction: column;
     align-items: flex-start;
   }
