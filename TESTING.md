@@ -63,6 +63,8 @@ DATABASE_URL=postgresql://gaokao_app:YOUR_PASSWORD@127.0.0.1:5432/gaokao_plannin
 
 ## 4. 数据导入验证
 
+本章检查依赖本地 `data_assets/` 原始数据或导入产物，不属于默认单元测试门禁。新同事如果没有同步本地数据资产，可以先跳过本章，只执行第 8 章质量门禁。
+
 ### 4.1 基础数据导入
 
 原始文件：
@@ -373,7 +375,40 @@ npm run test:frontend:error-states
 
 ---
 
-## 8. 构建检查
+## 8. 质量门禁
+
+提交业务代码前，至少执行下面四条命令。
+
+### 8.1 后端统一测试
+
+```bash
+npm run test:backend
+```
+
+等价于：
+
+```bash
+python -m unittest discover -s backend/tests
+```
+
+要求：
+
+- 不依赖被 `.gitignore` 排除的 `data_assets/` 实体目录。
+- 需要外部文件系统或导入产物的测试，应使用 fixture / mock 隔离。
+- 如果新增需要真实数据库或真实数据资产的检查，请放到手工冒烟或导入验证章节，不要混入默认单元测试门禁。
+
+### 8.2 前端 lint
+
+```bash
+npm run lint
+```
+
+要求：
+
+- 检查前端 JS/Vue/脚本基础语法和常见问题。
+- 默认忽略 `dist/`、`node_modules/`、`backend/` 和 `data_assets/`。
+
+### 8.3 前端生产构建
 
 执行：
 
@@ -385,6 +420,28 @@ npm run build
 
 - Vite 构建成功
 - 生成 `dist/` 产物
+- 当前 Element Plus 分包超过 500 kB 的提示是已知优化项，不应阻断本门禁；后续前端拆包时再收敛。
+
+### 8.4 前端错误态回归
+
+```bash
+npm run test:frontend:error-states
+```
+
+要求：
+
+- 断开 `/api` 后，关键页面展示正式错误卡片。
+- 不允许静默回退到旧 demo / mock / fallback 数据。
+- 该脚本会先执行一次 `vite build`，因此可以覆盖生产构建后的错误态表现。
+
+### 8.5 需要本地数据资产的检查
+
+以下检查不属于默认质量门禁，需要本机具备数据库连接和 `data_assets/` 目录：
+
+- 第 4 章基础数据导入、河南招生主数据导入、河南政策/章程规则导入。
+- 第 6 章后端接口冒烟，尤其是真实学生链路和导出接口。
+- 第 7 章前端关键页面联调。
+- 报告导出文件检查，输出目录为 `data_assets/generated_reports/`。
 
 ---
 

@@ -327,14 +327,6 @@ function riskTagType(level) {
   }[String(level || "")] || "info";
 }
 
-function adjustmentTagType(preference) {
-  return {
-    accept: "success",
-    discuss: "warning",
-    reject: "danger"
-  }[String(preference || "")] || "info";
-}
-
 function formatFileSize(value) {
   const size = Number(value);
   if (!Number.isFinite(size) || size <= 0) {
@@ -505,7 +497,7 @@ async function handleDeliveryDownload(record, options = {}) {
         `${(record.export_format || "文件").toUpperCase()} 下载已开始：${record.artifact_name || "正式交付文件"}`
       );
     }
-  } catch (error) {
+  } catch {
     emit(
       "open-dialog",
       `当前下载未成功，可能是文件已失效或已被移动：${record.artifact_name || "正式交付文件"}`

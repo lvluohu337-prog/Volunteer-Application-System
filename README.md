@@ -170,6 +170,7 @@ volunteer-application-system/
 │   ├── 系统目标差距分析.md
 │   ├── 志愿报告功能差距分析.md
 │   ├── 数据整理与正式版落地清单.md
+│   ├── 总体架构说明_同事版_2026-06-17.md
 │   ├── PostgreSQL真实数据导入执行记录_2026-06-10.md
 │   └── PostgreSQL真实数据核验台账_2026-06-10.md
 │
@@ -272,6 +273,7 @@ volunteer-application-system/
 
 - [x] 后端单元测试（admissions_engine 等）
 - [x] 后端冒烟测试指南（TESTING.md）
+- [x] 质量门禁命令：`npm run test:backend`、`npm run lint`、`npm run build`、`npm run test:frontend:error-states`
 - [x] 数据导入验证脚本
 - [ ] 完整的前端页面联调验收
 - [ ] 推荐引擎回归测试
@@ -525,7 +527,28 @@ npm run dev
 
 ---
 
-## 10. 下一步计划
+## 10. 质量门禁
+
+提交业务代码前，至少执行下面四条命令：
+
+```bash
+npm run test:backend
+npm run lint
+npm run build
+npm run test:frontend:error-states
+```
+
+说明：
+
+- `npm run test:backend` 运行后端单元测试，默认不依赖被 `.gitignore` 排除的 `data_assets/` 实体目录。
+- `npm run lint` 检查前端 JS/Vue/脚本基础语法与常见问题。
+- `npm run build` 验证前端生产构建；当前 Element Plus 分包体积警告属于已知优化项。
+- `npm run test:frontend:error-states` 验证断后端接口时页面显示正式错误态，不允许静默回退到 mock/demo 数据。
+- 数据导入、报告真实导出、端到端冒烟等需要本地数据库和 `data_assets/` 的检查，按 `TESTING.md` 单独执行。
+
+---
+
+## 11. 下一步计划
 
 ### 近期（MVP → 可商用）
 
@@ -533,6 +556,7 @@ npm run dev
 - [ ] **P0** 结构化推荐表导出到 PDF/Word（`report_exporters.py`）
 - [ ] **P0** 闭环测试：录入→分析→推荐→报告→导出全链路验收
 - [ ] **P1** "天赋→专业方向→院校专业"完整推荐链路
+- [ ] **P1** 参考同事版总体架构说明，梳理双阶段流程、三档产品和合规边界
 - [ ] **P1** 省份批次线数据补充（`province_batches`）
 - [ ] **P1** 风险规则库扩充
 - [ ] **P2** 多省份真实招生数据导入
@@ -554,7 +578,7 @@ npm run dev
 
 ---
 
-## 11. 给 AI 的协作规则
+## 12. 给 AI 的协作规则
 
 后续让 AI 开发或整理项目时，建议先发送下面这段：
 
@@ -578,7 +602,7 @@ npm run dev
 
 ---
 
-## 12. Agent 记录要求
+## 13. Agent 记录要求
 
 - 每次执行任务前，先读取项目根目录下的 `agent.md`（如果存在）。
 - 如果 `agent.md` 不存在，需要创建并初始化。

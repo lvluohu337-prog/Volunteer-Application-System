@@ -150,12 +150,16 @@ export async function apiRequest(path, options = {}) {
     return typeof transform === "function" ? transform(resolvedData) : resolvedData;
   } catch (error) {
     if (error instanceof TypeError) {
-      throw new Error("后端接口当前不可达，请确认服务是否已启动后重试。");
+      throw new Error("后端接口当前不可达，请确认服务是否已启动后重试。", {
+        cause: error
+      });
     }
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error("请求失败，请检查网络或稍后重试。");
+    throw new Error("请求失败，请检查网络或稍后重试。", {
+      cause: error
+    });
   }
 }
 

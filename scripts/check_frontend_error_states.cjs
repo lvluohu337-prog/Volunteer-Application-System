@@ -82,6 +82,13 @@ const CONTENT_TYPES = {
   ".svg": "image/svg+xml",
   ".woff2": "font/woff2"
 };
+const UNSAFE_BROWSER_PORTS = new Set([
+  1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87,
+  95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135, 137, 139,
+  143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532, 540, 548,
+  554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723, 2049, 3659,
+  4045, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669, 6697, 10080
+]);
 
 function assert(condition, message) {
   if (!condition) {
@@ -133,10 +140,27 @@ function createSpaServer() {
 }
 
 async function listen(server) {
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
+  const firstPort = Number(process.env.FRONTEND_ERROR_STATE_PORT || 4174);
+  const candidatePorts = Array.from({ length: 40 }, (_, index) => firstPort + index).filter(
+    (port) => !UNSAFE_BROWSER_PORTS.has(port)
+  );
+
+  for (const port of candidatePorts) {
+    try {
+      await new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(port, "127.0.0.1", resolve);
+      });
+      break;
+    } catch (error) {
+      server.removeAllListeners("error");
+      if (error.code !== "EADDRINUSE") {
+        throw error;
+      }
+    }
+  }
+
+  assert(server.listening, "无法启动前端错误态回归本地服务，请检查 4174-4213 端口占用。");
   return server.address().port;
 }
 
