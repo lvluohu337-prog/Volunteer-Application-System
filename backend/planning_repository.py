@@ -296,11 +296,6 @@ def _fetch_report_template_rows(product_code: str | None = None) -> list[dict[st
     return fallback_rows
 
 
-def _build_policy_summary_text(policy_highlights: list[dict[str, Any]]) -> str:
-    return "；".join(
-        f"{item.get('year') or '当年'}《{item.get('title') or '政策依据'}》：{item.get('summary') or '待补充摘要'}"
-        for item in policy_highlights[:3]
-    ) or "当前暂未提取出可直接引用的本省政策摘要，正式交付前建议继续补充政策原文复核。"
 
 
 def _clean_policy_summary(summary: str, *, max_sentences: int = 2) -> str:
@@ -1876,85 +1871,8 @@ def _candidate_policy_topics(bundle: dict[str, Any], limit: int = 10) -> dict[st
     return selected
 
 
-def _format_policy_highlight(item: dict[str, Any], policy_topic: str | None = None) -> dict[str, Any]:
-    topic_key = str(policy_topic or "").strip()
-    original_title = str(item.get("policy_title") or "政策依据").strip() or "政策依据"
-    summary = str(item.get("trend_summary") or "").strip()
-    display_title = original_title
-    if topic_key:
-        display_title = POLICY_TOPIC_DISPLAY_MAP.get(topic_key, (original_title, ""))[0] or original_title
-    if topic_key and summary:
-        summary = f"依据《{original_title}》提炼：{summary}"
-    return {
-        "year": item.get("exam_year"),
-        "key": item.get("policy_key"),
-        "title": display_title,
-        "type": item.get("trend_type") or "policy",
-        "summary": summary,
-        "source": str(item.get("source_url") or "").replace("/", "\\").split("\\")[-1],
-        "documentTitle": original_title,
-        "policyTopic": topic_key or None,
-    }
 
 
-def _fetch_policy_highlights(student: dict[str, Any], bundle: dict[str, Any], limit: int = 3) -> list[dict[str, Any]]:
-    province = student.get("province")
-    if not province:
-        return []
-
-    with db_session() as connection:
-        rows = connection.execute(
-            """
-            SELECT exam_year, policy_key, policy_title, trend_type, trend_summary, impact_scope, source_url
-            FROM policy_trends
-            WHERE province = ?
-            ORDER BY exam_year DESC, id DESC
-            """,
-            [province],
-        ).fetchall()
-
-    signal_text = _policy_signal_text(student, bundle)
-    direct_policy_keys = _candidate_policy_keys(bundle)
-    scored: list[tuple[int, dict[str, Any]]] = []
-    seen_keys: set[str] = set()
-    for row in rows:
-        item = dict(row)
-        policy_key = str(item.get("policy_key") or "")
-        score = 0
-        if "general_regulation" in policy_key:
-            score += 1
-        if policy_key in direct_policy_keys:
-            score += 20
-        if _policy_matches_signal_text(policy_key, signal_text):
-            score += 6
-        if any(
-            policy_key == str(risk.get("policy_key") or "")
-            for candidate in (bundle.get("candidates") or [])[:10]
-            for risk in (candidate.get("risks") or [])
-        ):
-            score += 10
-        if score <= 0 and "general_regulation" not in policy_key:
-            continue
-        if policy_key in seen_keys:
-            continue
-        seen_keys.add(policy_key)
-        scored.append((score, item))
-
-    scored.sort(key=lambda pair: (pair[0], pair[1].get("exam_year") or 0), reverse=True)
-    highlights: list[dict[str, Any]] = []
-    for _, item in scored[:limit]:
-        source_name = str(item.get("source_url") or "").replace("/", "\\").split("\\")[-1]
-        highlights.append(
-            {
-                "year": item.get("exam_year"),
-                "key": item.get("policy_key"),
-                "title": item.get("policy_title") or "政策依据",
-                "type": item.get("trend_type") or "policy",
-                "summary": item.get("trend_summary") or "",
-                "source": source_name,
-            }
-        )
-    return highlights
 
 
 def _format_policy_highlight(item: dict[str, Any], policy_topic: str | None = None) -> dict[str, Any]:
