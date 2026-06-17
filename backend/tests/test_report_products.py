@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 from backend.planning_repository import _build_report_product_catalog
 from backend.report_products import (
@@ -25,7 +26,30 @@ class ReportProductsDefinitionTest(unittest.TestCase):
         self.assertEqual(get_report_product_label("699"), "399 元标准版报告")
 
     def test_report_product_catalog_returns_formal_delivery_channels(self):
-        catalog = _build_report_product_catalog("399")
+        template_rows = [
+            {
+                "product_name": "99 元基础版报告",
+                "module_name": "基础画像",
+                "suggested_pages": 6,
+                "requires_manual_review": 0,
+            },
+            {
+                "product_name": "399 元标准版报告",
+                "module_name": "正式志愿方案",
+                "suggested_pages": 18,
+                "requires_manual_review": 1,
+            },
+            {
+                "product_name": "999 元深度版报告",
+                "module_name": "深度复核方案",
+                "suggested_pages": 30,
+                "requires_manual_review": 1,
+            },
+        ]
+
+        with patch("backend.planning_repository._fetch_report_template_rows", return_value=template_rows):
+            catalog = _build_report_product_catalog("399")
+
         by_code = {item["code"]: item for item in catalog}
 
         self.assertEqual(by_code["99"]["deliveryChannels"], ["web", "pdf"])
