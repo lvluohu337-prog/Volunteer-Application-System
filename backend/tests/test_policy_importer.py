@@ -1,16 +1,58 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
-from backend.policy_importer import load_henan_policy_rule_datasets
+from backend.policy_importer import POLICY_DOCUMENTS, load_henan_policy_rule_datasets
 
 
 class PolicyImporterTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        cls._locate_patch = patch(
+            "backend.policy_importer.locate_policy_documents",
+            return_value={item["policy_key"]: Path(item["file_name"]) for item in POLICY_DOCUMENTS},
+        )
+        cls._extract_patch = patch(
+            "backend.policy_importer.extract_policy_text",
+            side_effect=lambda path: "\n".join(
+                [
+                    path.name,
+                    "政策摘要",
+                    "体检",
+                    "单招",
+                    "对口",
+                    "体育",
+                    "艺术",
+                    "资质审核",
+                ]
+            ),
+        )
+        cls._institution_patch = patch(
+            "backend.policy_importer._find_matching_institutions",
+            side_effect=lambda province, keywords: [
+                {
+                    "id": 1,
+                    "institution_code": "FAKE",
+                    "institution_name": "河南示例学院",
+                }
+            ]
+            if keywords
+            else [],
+        )
+        cls._locate_patch.start()
+        cls._extract_patch.start()
+        cls._institution_patch.start()
         cls.datasets = load_henan_policy_rule_datasets()
         cls.risk_rows = cls.datasets["admission_risk_rules"]
         cls.policy_rows = cls.datasets["policy_trends"]
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._institution_patch.stop()
+        cls._extract_patch.stop()
+        cls._locate_patch.stop()
 
     def test_expanded_policy_import_builds_more_than_original_14_risk_rules(self):
         self.assertGreaterEqual(len(self.risk_rows), 22)
