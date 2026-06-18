@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from backend.admissions_engine import _prepare_recommendation_outputs, build_plan_columns_from_candidates
+from backend.admissions_engine import build_plan_columns_from_candidates
+from backend.admissions_presenter import _prepare_recommendation_outputs
 
 
 def _candidate(index: int, bucket: str, composite_score: float, risk_level: str = "medium") -> dict:
