@@ -2,47 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
+from backend.admissions_scoring import (
+    BUCKET_FALLBACKS,
+    BUCKET_META,
+    BUCKET_ORDER,
+    RISK_LEVEL_LABELS,
+    _bucket_gap,
+)
 from backend.rules_engine import safe_int, safe_number
 
-
-BUCKET_PRIORITY = {
-    "out": 0,
-    "rush": 1,
-    "steady": 2,
-    "safe": 3,
-}
-
-BUCKET_META = {
-    "rush": {"title": "冲一冲", "tag": "风险较高", "variant": "warning"},
-    "steady": {"title": "稳一稳", "tag": "建议主力", "variant": "primary"},
-    "safe": {"title": "保一保", "tag": "相对安全", "variant": "success"},
-}
 
 RECOMMENDATION_TARGETS = {
     "rush": 3,
     "steady": 5,
     "safe": 3,
 }
-
-BUCKET_ORDER = ("rush", "steady", "safe")
-BUCKET_INDEX = {name: index for index, name in enumerate(BUCKET_ORDER)}
-BUCKET_FALLBACKS = {
-    "rush": ("steady", "safe"),
-    "steady": ("safe", "rush"),
-    "safe": ("steady", "rush"),
-}
-
-RISK_LEVEL_LABELS = {
-    "low": "低风险",
-    "medium": "中风险",
-    "high": "高风险",
-    "review": "待人工复核",
-}
-
-
-def _bucket_gap(left: str, right: str) -> int:
-    return abs(BUCKET_INDEX.get(left, 0) - BUCKET_INDEX.get(right, 0))
-
 
 def _candidate_sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
     probability_score = safe_int((item.get("probability") or {}).get("score"))

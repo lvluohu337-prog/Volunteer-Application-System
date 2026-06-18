@@ -4,6 +4,11 @@ import unittest
 
 from backend.admissions_engine import build_plan_columns_from_candidates
 from backend.admissions_presenter import _prepare_recommendation_outputs
+from backend.admissions_scoring import (
+    _evaluate_rank_bucket,
+    _evaluate_score_bucket,
+    _resolve_candidate_bucket,
+)
 
 
 def _candidate(index: int, bucket: str, composite_score: float, risk_level: str = "medium") -> dict:
@@ -44,6 +49,17 @@ def _candidate(index: int, bucket: str, composite_score: float, risk_level: str 
 
 
 class AdmissionsEngineTest(unittest.TestCase):
+    def test_scoring_module_resolves_candidate_bucket_from_rank_score_and_probability(self):
+        row = {"min_rank": 15000, "min_score": 560}
+
+        rank_result = _evaluate_rank_bucket(9000, row)
+        score_result = _evaluate_score_bucket(580, row)
+        self.assertEqual(_resolve_candidate_bucket(rank_result, score_result, {"score": 90}), "safe")
+
+        weak_rank_result = _evaluate_rank_bucket(30000, row)
+        weak_score_result = _evaluate_score_bucket(540, row)
+        self.assertEqual(_resolve_candidate_bucket(weak_rank_result, weak_score_result, {"score": 30}), "out")
+
     def test_prepare_recommendation_outputs_balances_to_353_targets(self):
         candidates = [
             _candidate(1, "rush", 70.0),
