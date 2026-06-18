@@ -5,6 +5,7 @@ import { fetchAnalysisData } from "../api/planning.js";
 import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
 import PanelSection from "../components/PanelSection.vue";
+import ProductFlowGuide from "../components/ProductFlowGuide.vue";
 import RequestErrorNotice from "../components/RequestErrorNotice.vue";
 import StatusTag from "../components/StatusTag.vue";
 
@@ -191,6 +192,10 @@ function goToStudentDetail() {
   router.push({ name: "student-detail", params: { studentId: String(studentId.value) } });
 }
 
+function goToProductFlowTarget(target) {
+  router.push(target);
+}
+
 watch(
   () => route.query.studentId,
   () => {
@@ -234,6 +239,15 @@ onMounted(() => {
         </RequestErrorNotice>
 
         <template v-else>
+        <ProductFlowGuide
+          v-if="hasStudent"
+          :student-id="studentId"
+          current-step="score_conversion"
+          compact
+          class="analysis-product-flow"
+          @navigate="goToProductFlowTarget"
+        />
+
         <el-card v-if="hasStudent" shadow="never" class="panel-card student-hero">
           <div class="student-hero-main">
             <h2>{{ summary.name }}</h2>
@@ -514,6 +528,10 @@ onMounted(() => {
   background:
     radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 32%),
     linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.88));
+}
+
+.analysis-product-flow {
+  margin-bottom: 16px;
 }
 
 .result-source-head {

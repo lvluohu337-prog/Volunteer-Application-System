@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { fetchStudentDetail, fetchStudentScoreRecords } from "../api/planning.js";
 import PageHeader from "../components/PageHeader.vue";
+import ProductFlowGuide from "../components/ProductFlowGuide.vue";
 import RequestErrorNotice from "../components/RequestErrorNotice.vue";
 import StatusTag from "../components/StatusTag.vue";
 
@@ -71,6 +72,10 @@ function buildStepTarget(name) {
 
 function goTo(name) {
   router.push(buildStepTarget(name));
+}
+
+function goToProductFlowTarget(target) {
+  router.push(target);
 }
 
 const nextAction = computed(() => {
@@ -310,6 +315,13 @@ onMounted(() => {
             </div>
           </el-card>
 
+          <ProductFlowGuide
+            :student-id="student.id"
+            current-step="entry_profile"
+            class="student-product-flow"
+            @navigate="goToProductFlowTarget"
+          />
+
           <div class="detail-grid">
             <el-card shadow="never" class="panel-card">
               <div class="section-head">
@@ -449,6 +461,10 @@ onMounted(() => {
 }
 
 .workflow-card {
+  margin-bottom: 16px;
+}
+
+.student-product-flow {
   margin-bottom: 16px;
 }
 

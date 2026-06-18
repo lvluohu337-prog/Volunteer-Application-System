@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:backend": "python -m unittest discover -s backend/tests",
+    "test:product-flow": "node scripts/check_product_flow.cjs",
     "test:frontend:error-states": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test_frontend_error_states.ps1"
   },
   "dependencies": {

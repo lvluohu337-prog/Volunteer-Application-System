@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import MetricCard from "../components/MetricCard.vue";
 import PageHeader from "../components/PageHeader.vue";
 import PanelSection from "../components/PanelSection.vue";
+import ProductFlowGuide from "../components/ProductFlowGuide.vue";
 import RequestErrorNotice from "../components/RequestErrorNotice.vue";
 import StatusTag from "../components/StatusTag.vue";
 import { fetchDashboardData } from "../api/planning.js";
@@ -90,6 +91,12 @@ onMounted(loadPageData);
         </RequestErrorNotice>
 
         <template v-else>
+        <ProductFlowGuide
+          current-step="entry_profile"
+          class="dashboard-product-flow"
+          @navigate="(target) => emit('navigate', target.name)"
+        />
+
         <div class="metrics-grid">
           <MetricCard
             v-for="metric in metrics"
@@ -167,6 +174,10 @@ onMounted(loadPageData);
 
 <style scoped>
 .workflow-card {
+  margin-bottom: 16px;
+}
+
+.dashboard-product-flow {
   margin-bottom: 16px;
 }
 

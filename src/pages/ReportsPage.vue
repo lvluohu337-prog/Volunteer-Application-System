@@ -10,6 +10,7 @@ import {
 } from "../api/planning.js";
 import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
+import ProductFlowGuide from "../components/ProductFlowGuide.vue";
 import RequestErrorNotice from "../components/RequestErrorNotice.vue";
 import ReportOutlineCard from "../components/reports/ReportOutlineCard.vue";
 import ReportProductCatalog from "../components/reports/ReportProductCatalog.vue";
@@ -417,6 +418,10 @@ function switchProduct(code) {
   });
 }
 
+function goToProductFlowTarget(target) {
+  router.push(target);
+}
+
 function updateNoteFormField(field, value) {
   if (Object.prototype.hasOwnProperty.call(noteForm.value, field)) {
     noteForm.value[field] = value;
@@ -571,6 +576,14 @@ watch(
 
         <template v-else>
         <div v-if="hasStudent" class="report-layout">
+          <ProductFlowGuide
+            :student-id="studentId"
+            current-step="formal_report"
+            compact
+            class="reports-product-flow"
+            @navigate="goToProductFlowTarget"
+          />
+
           <ReportResultSourceBanner
             :meta="resultSourceMeta"
             :result-source="resultSource"
@@ -1119,6 +1132,10 @@ watch(
 
 .auxiliary-note {
   margin-top: 14px;
+}
+
+.reports-product-flow {
+  margin-bottom: 16px;
 }
 
 @media (max-width: 767px) {
