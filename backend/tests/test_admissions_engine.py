@@ -4,6 +4,7 @@ import unittest
 
 from backend.admissions_engine import build_plan_columns_from_candidates
 from backend.admissions_presenter import _prepare_recommendation_outputs
+from backend.admissions_query import _candidate_pair_clause
 from backend.admissions_scoring import (
     _evaluate_rank_bucket,
     _evaluate_score_bucket,
@@ -49,6 +50,22 @@ def _candidate(index: int, bucket: str, composite_score: float, risk_level: str 
 
 
 class AdmissionsEngineTest(unittest.TestCase):
+    def test_query_module_builds_unique_candidate_pair_clause(self):
+        rows = [
+            {"institution_id": 1, "major_id": 10},
+            {"institution_id": 1, "major_id": 10},
+            {"institution_id": 2, "major_id": 20},
+            {"institution_id": None, "major_id": 30},
+        ]
+
+        clause, values = _candidate_pair_clause(rows, "mas.institution_id", "mas.major_id")
+
+        self.assertEqual(
+            clause,
+            "(mas.institution_id = ? AND mas.major_id = ?) OR (mas.institution_id = ? AND mas.major_id = ?)",
+        )
+        self.assertEqual(values, [1, 10, 2, 20])
+
     def test_scoring_module_resolves_candidate_bucket_from_rank_score_and_probability(self):
         row = {"min_rank": 15000, "min_score": 560}
 
