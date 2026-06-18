@@ -82,8 +82,8 @@ class AdmissionsEngineBatchLogicTest(unittest.TestCase):
             {"batch_code": "专科批", "score_line": 190},
         ]
 
-        with patch("backend.admissions_engine._latest_admission_year", return_value=2023), patch(
-            "backend.admissions_engine._fetch_latest_province_batch_rows",
+        with patch("backend.admissions_context._latest_admission_year", return_value=2023), patch(
+            "backend.admissions_context._fetch_latest_province_batch_rows",
             return_value=(province_batch_rows, 2022),
         ):
             context = build_admissions_context(student)
