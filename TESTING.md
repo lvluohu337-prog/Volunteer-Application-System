@@ -377,7 +377,7 @@ npm run test:frontend:error-states
 
 ## 8. 质量门禁
 
-提交业务代码前，至少执行下面四条命令。
+提交业务代码前，至少执行下面五条命令。
 
 ### 8.1 后端统一测试
 
@@ -397,7 +397,19 @@ python -m unittest discover -s backend/tests
 - 需要外部文件系统或导入产物的测试，应使用 fixture / mock 隔离。
 - 如果新增需要真实数据库或真实数据资产的检查，请放到手工冒烟或导入验证章节，不要混入默认单元测试门禁。
 
-### 8.2 前端 lint
+### 8.2 首次进入产品流回归
+
+```bash
+npm run test:product-flow
+```
+
+要求：
+
+- 固定“入口引导/画像分析 -> 分数换算 -> 正式推荐报告”的步骤顺序。
+- 固定每一步的目标路由，避免入口引导、分析页、报告页之间的产品链路被误改。
+- 不依赖真实数据库或本地 `data_assets/`。
+
+### 8.3 前端 lint
 
 ```bash
 npm run lint
@@ -408,7 +420,7 @@ npm run lint
 - 检查前端 JS/Vue/脚本基础语法和常见问题。
 - 默认忽略 `dist/`、`node_modules/`、`backend/` 和 `data_assets/`。
 
-### 8.3 前端生产构建
+### 8.4 前端生产构建
 
 执行：
 
@@ -420,9 +432,9 @@ npm run build
 
 - Vite 构建成功
 - 生成 `dist/` 产物
-- 当前 Element Plus 分包超过 500 kB 的提示是已知优化项，不应阻断本门禁；后续前端拆包时再收敛。
+- 当前分包配置可通过生产构建；如新增大页面或重依赖，应优先保持按页面/职责拆包。
 
-### 8.4 前端错误态回归
+### 8.5 前端错误态回归
 
 ```bash
 npm run test:frontend:error-states
@@ -434,7 +446,7 @@ npm run test:frontend:error-states
 - 不允许静默回退到旧 demo / mock / fallback 数据。
 - 该脚本会先执行一次 `vite build`，因此可以覆盖生产构建后的错误态表现。
 
-### 8.5 需要本地数据资产的检查
+### 8.6 需要本地数据资产的检查
 
 以下检查不属于默认质量门禁，需要本机具备数据库连接和 `data_assets/` 目录：
 
