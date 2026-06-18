@@ -15,6 +15,7 @@ import ReportOutlineCard from "../components/reports/ReportOutlineCard.vue";
 import ReportProductCatalog from "../components/reports/ReportProductCatalog.vue";
 import ReportRecommendationTable from "../components/reports/ReportRecommendationTable.vue";
 import ReportResultSourceBanner from "../components/reports/ReportResultSourceBanner.vue";
+import ReportTraceabilityPanel from "../components/reports/ReportTraceabilityPanel.vue";
 import {
   COMPLIANCE_COPY_RULES,
   COMPLIANCE_DISCLAIMER,
@@ -414,6 +415,12 @@ function switchProduct(code) {
       productCode: code
     }
   });
+}
+
+function updateNoteFormField(field, value) {
+  if (Object.prototype.hasOwnProperty.call(noteForm.value, field)) {
+    noteForm.value[field] = value;
+  }
 }
 
 async function submitAdvisorNote() {
@@ -885,110 +892,20 @@ watch(
               </div>
             </section>
 
-            <section class="traceability-grid">
-              <article class="traceability-card">
-                <header class="traceability-head">
-                  <strong>咨询师补充备注</strong>
-                  <span>这些内容会作为正式交付前的人工作业留痕。</span>
-                </header>
-                <div class="note-form">
-                  <el-input v-model="noteForm.author_name" placeholder="咨询师姓名" />
-                  <el-input v-model="noteForm.note_title" placeholder="备注标题，例如：与家长沟通重点" />
-                  <el-input
-                    v-model="noteForm.note_content"
-                    type="textarea"
-                    :rows="4"
-                    placeholder="输入本次需要补充给报告的人工作业说明、特殊提醒或沟通结论。"
-                  />
-                  <div class="note-actions">
-                    <el-button type="primary" :loading="savingNote" @click="submitAdvisorNote">
-                      保存咨询师备注
-                    </el-button>
-                  </div>
-                </div>
-                <p class="table-note">
-                  顾问备注同样适用统一合规口径：{{ complianceRules[3] || "禁止使用承诺性表述。" }}
-                </p>
-                <div v-if="advisorNotes.length" class="trace-list">
-                  <article
-                    v-for="note in advisorNotes"
-                    :key="note.id"
-                    class="trace-item"
-                  >
-                    <strong>{{ note.note_title || "未命名备注" }}</strong>
-                    <span>{{ note.author_name || "咨询师" }} / {{ note.updated_at }}</span>
-                    <p>{{ note.note_content }}</p>
-                  </article>
-                </div>
-                <p v-else class="table-note">当前还没有咨询师补充备注，适合在人工复核后开始积累。</p>
-              </article>
-
-              <article class="traceability-card">
-                <header class="traceability-head">
-                  <strong>报告生成记录</strong>
-                  <span>每次打开真实报告都会自动记录一条生成留痕。</span>
-                </header>
-                <div v-if="generationRecords.length" class="trace-list">
-                  <article
-                    v-for="record in generationRecords"
-                    :key="record.id"
-                    class="trace-item"
-                  >
-                    <strong>{{ record.report_title || reportTitle }}</strong>
-                    <span>
-                      {{ record.created_at }} / {{ record.generation_mode || "preview" }} / {{ record.generated_by || "system-preview" }}
-                    </span>
-                    <p>
-                      {{ record.summary?.scoreLevel || "待补充分层" }}
-                      <template v-if="record.summary?.matchedMajors?.length">
-                        / {{ record.summary.matchedMajors.join("、") }}
-                      </template>
-                    </p>
-                  </article>
-                </div>
-                <p v-else class="table-note">当前还没有生成记录。</p>
-              </article>
-
-              <article class="traceability-card">
-                <header class="traceability-head">
-                  <strong>导出与交付记录</strong>
-                  <span>优先提供可直接访问的下载入口，并保留生成时间、操作人与文件留痕信息。</span>
-                </header>
-                <div v-if="deliveryRecords.length" class="trace-list">
-                  <article
-                    v-for="record in deliveryRecords"
-                    :key="record.id"
-                    class="trace-item"
-                  >
-                    <div class="trace-item-head">
-                      <strong>{{ record.export_format?.toUpperCase() }} / {{ record.report_title || reportTitle }}</strong>
-                      <el-tag :type="record.artifactExists ? 'success' : 'danger'">
-                        {{ record.artifactExists ? "文件可下载" : "文件缺失" }}
-                      </el-tag>
-                    </div>
-                    <span>{{ record.created_at }} / {{ record.generated_by || "system-export" }}</span>
-                    <p>{{ record.artifact_name }}</p>
-                    <div class="trace-download-row">
-                      <el-button
-                        type="primary"
-                        plain
-                        size="small"
-                        :disabled="!record.artifactExists"
-                        :loading="downloadingRecordId === record.id"
-                        @click="handleDeliveryDownload(record)"
-                      >
-                        下载 {{ record.export_format?.toUpperCase() || "文件" }}
-                      </el-button>
-                      <span class="table-note">
-                        {{ record.artifactSizeBytes ? formatFileSize(record.artifactSizeBytes) : "待补充文件大小" }}
-                      </span>
-                    </div>
-                    <p class="table-note">留痕路径：{{ record.artifactPathLabel || record.artifact_path }}</p>
-                  </article>
-                </div>
-                <p v-else class="table-note">当前还没有导出记录，正式导出后会自动留痕。</p>
-              </article>
-            </section>
+            <ReportTraceabilityPanel
+              :note-form="noteForm"
+              :saving-note="savingNote"
+              :compliance-note="complianceRules[3] || '禁止使用承诺性表述。'"
+              :advisor-notes="advisorNotes"
+              :generation-records="generationRecords"
+              :delivery-records="deliveryRecords"
+              :report-title="reportTitle"
+              :downloading-record-id="downloadingRecordId"
+              :format-file-size="formatFileSize"
+              @update-note-field="updateNoteFormField"
+              @submit-note="submitAdvisorNote"
+              @download-record="handleDeliveryDownload"
+            />
           </el-card>
           </template>
         </div>
@@ -1006,20 +923,6 @@ watch(
 </template>
 
 <style scoped>
-.trace-item-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.trace-download-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
 .module-card {
   padding: 16px;
   border-radius: 18px;
@@ -1131,8 +1034,7 @@ watch(
 }
 
 .policy-highlight-card strong,
-.decision-card strong,
-.trace-item strong {
+.decision-card strong {
   display: block;
 }
 
@@ -1217,66 +1119,6 @@ watch(
 
 .auxiliary-note {
   margin-top: 14px;
-}
-
-.traceability-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-}
-
-.traceability-card {
-  padding: 18px;
-  border-radius: 20px;
-  border: 1px solid rgba(66, 133, 244, 0.12);
-  background: linear-gradient(180deg, rgba(66, 133, 244, 0.06), rgba(66, 133, 244, 0.02));
-}
-
-.traceability-head {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 14px;
-}
-
-.traceability-head span {
-  color: var(--app-text-secondary);
-  font-size: 13px;
-}
-
-.note-form {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.note-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.trace-list {
-  display: grid;
-  gap: 10px;
-}
-
-.trace-item {
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(66, 133, 244, 0.08);
-}
-
-.trace-item span {
-  display: block;
-  margin: 6px 0 8px;
-  color: var(--app-text-secondary);
-  font-size: 12px;
-}
-
-.trace-item p {
-  margin: 0;
-  line-height: 1.7;
 }
 
 @media (max-width: 767px) {
