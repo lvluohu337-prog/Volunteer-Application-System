@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "test:backend": "python -m unittest discover -s backend/tests",
     "test:product-flow": "node scripts/check_product_flow.cjs",
+    "test:product-flow:e2e": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test_product_flow_e2e.ps1",
     "test:frontend:error-states": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test_frontend_error_states.ps1"
   },
   "dependencies": {

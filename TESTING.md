@@ -455,6 +455,19 @@ npm run test:frontend:error-states
 - 第 7 章前端关键页面联调。
 - 报告导出文件检查，输出目录为 `data_assets/generated_reports/`。
 
+### 8.7 交付前端到端检查
+
+```bash
+npm run test:product-flow:e2e
+```
+
+要求：
+
+- 先执行前端生产构建，再启动本地 SPA 服务。
+- 使用本地 mock API，不依赖远程 PostgreSQL 或 `data_assets/`。
+- 用真实浏览器验证“工作台 -> 学生录入 -> 学生工作台 -> 分数换算 -> 正式推荐报告”的 happy path。
+- 断言正式报告页能看到真实招生结果提示、冲稳保推荐表和推荐院校行。
+
 ---
 
 ## 9. 当前已验证事实

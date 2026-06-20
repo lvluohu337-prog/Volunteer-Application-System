@@ -277,6 +277,7 @@ volunteer-application-system/
 - [x] 后端单元测试（admissions_engine 等）
 - [x] 后端冒烟测试指南（TESTING.md）
 - [x] 质量门禁命令：`npm run test:backend`、`npm run test:product-flow`、`npm run lint`、`npm run build`、`npm run test:frontend:error-states`
+- [x] 首次进入产品流 Playwright happy path：`npm run test:product-flow:e2e`
 - [x] 数据导入验证脚本
 - [ ] 完整的前端页面联调验收
 - [ ] 推荐引擎回归测试
@@ -549,6 +550,7 @@ npm run test:frontend:error-states
 - `npm run lint` 检查前端 JS/Vue/脚本基础语法与常见问题。
 - `npm run build` 验证前端生产构建和当前分包配置。
 - `npm run test:frontend:error-states` 验证断后端接口时页面显示正式错误态，不允许静默回退到 mock/demo 数据。
+- `npm run test:product-flow:e2e` 为交付前扩展门禁，使用本地 mock API 和真实浏览器验证“工作台 -> 学生录入 -> 学生工作台 -> 分数换算 -> 正式推荐报告”的 happy path。
 - 数据导入、报告真实导出、端到端冒烟等需要本地数据库和 `data_assets/` 的检查，按 `TESTING.md` 单独执行。
 
 ---
@@ -560,7 +562,7 @@ npm run test:frontend:error-states
 - [ ] **P0** 冲稳保分层稳定性优化（`admissions_engine.py`）
 - [ ] **P0** 结构化推荐表导出到 PDF/Word（`report_exporters.py`）
 - [ ] **P0** 闭环测试：录入→分析→推荐→报告→导出全链路验收
-- [ ] **P1** 首次进入产品流 Playwright happy path 验收
+- [x] **P1** 首次进入产品流 Playwright happy path 验收
 - [ ] **P1** "天赋→专业方向→院校专业"完整推荐链路
 - [ ] **P1** 省份批次线数据补充（`province_batches`）
 - [ ] **P1** 风险规则库扩充

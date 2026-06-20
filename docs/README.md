@@ -57,3 +57,11 @@ npm run test:frontend:error-states
 ```
 
 其中 `npm run test:product-flow` 用于防止“入口引导/画像分析 -> 分数换算 -> 正式推荐报告”的首次进入产品流顺序被误改。
+
+交付前建议额外执行：
+
+```bash
+npm run test:product-flow:e2e
+```
+
+该命令用本地 mock API 和真实浏览器验证首次进入产品流 happy path，不依赖远程数据库或 `data_assets/`。
