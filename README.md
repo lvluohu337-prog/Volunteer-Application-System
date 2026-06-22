@@ -429,6 +429,16 @@ npm install
 pip install -r backend/requirements.txt
 ```
 
+### 命理引擎（Phase 1）
+
+- 首次拉起精确四柱桥接前，先安装一次 Node 侧依赖：`npm install --prefix tools/metaphysics_bridge`
+- 后端命理兼容回归命令：
+  - `python -m unittest backend.tests.test_metaphysics_bridge -v`
+  - `python -m unittest backend.tests.test_metaphysics_profile -v`
+  - `python -m unittest backend.tests.test_intake_inference_compat -v`
+- 正式环境默认严格模式：Node 桥接失败时直接报错，不允许静默回退成旧算法结果。
+- 开发环境只有在调用方显式传入 `fallback_mode="legacy"` 时，才允许回退到旧画像推导逻辑。
+
 ### 配置数据库
 
 创建 `.env` 文件（在项目根目录）：

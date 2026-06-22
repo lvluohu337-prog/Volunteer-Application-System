@@ -297,45 +297,14 @@ def _hour_branch_text(birth_time: str | None) -> str | None:
     return HOUR_BRANCH_LABELS[index]
 
 
-def derive_birth_profile_legacy(birthday: str | None, birth_time: str | None = None) -> dict[str, Any]:
-    parsed = parse_birthday(birthday)
-    parsed_time = parse_birth_time(birth_time)
-    if parsed is None:
-        return {
-            "birthday": birthday,
-            "birthTime": birth_time,
-            "birthdayType": "公历",
-            "constellation": None,
-            "pillars": {"year": None, "month": None, "day": None, "hour": None},
-            "wuxing": {"counts": {}, "dominant": None, "secondary": None},
-            "profile": {
-                "personalityTraits": [],
-                "learningStyle": [],
-                "interestDirections": [],
-                "regionPreferences": [],
-                "developmentGoals": [],
-                "explanations": [],
-            },
-            "autofill": {
-                "constellation": None,
-                "bazi_year_pillar": None,
-                "bazi_month_pillar": None,
-                "bazi_day_pillar": None,
-                "bazi_hour_pillar": None,
-                "interest_preferences": None,
-                "region_preference": None,
-                "development_goal": None,
-            },
-            "disclaimer": "请输入阳历生日后再进行辅助推算。",
-        }
-
-    constellation = infer_constellation(birthday)
-    pillars = infer_four_pillars(birthday, birth_time)
-    counts = _collect_elements(pillars)
-    ranked_elements = _dominant_elements(counts)
-    dominant = ranked_elements[0] if ranked_elements else None
-    secondary = ranked_elements[1] if len(ranked_elements) > 1 else None
-
+def _build_profile_sections(
+    *,
+    constellation: str | None,
+    dominant: str | None,
+    secondary: str | None,
+    parsed_time: tuple[int, int] | None,
+    pillars: dict[str, str | None],
+) -> tuple[dict[str, list[str]], list[str], list[str], list[str]]:
     constellation_traits = CONSTELLATION_TRAIT_MAP.get(constellation or "", [])
     dominant_traits = ELEMENT_TRAIT_MAP.get(dominant or "", [])
     secondary_traits = ELEMENT_TRAIT_MAP.get(secondary or "", [])
@@ -375,11 +344,86 @@ def derive_birth_profile_legacy(birthday: str | None, birth_time: str | None = N
             "录入出生时辰后可自动补齐时柱。"
         )
 
-    explanations = [
-        explanation_prefix,
-        f"当前五行倾向以“{dominant or '待识别'}”为主，{('辅以' + secondary) if secondary else '辅助元素待补充'}。",
-        "兴趣、地域和发展建议仅作辅助解释，正式志愿仍需以分数、位次、招生规则和院校章程为核心依据。",
-    ]
+    profile = {
+        "personalityTraits": _merge_unique(dominant_traits, secondary_traits, constellation_traits)[:6],
+        "learningStyle": learning_style,
+        "interestDirections": interest_directions,
+        "regionPreferences": region_preferences,
+        "developmentGoals": development_goals,
+        "explanations": [
+            explanation_prefix,
+            f"当前五行倾向以“{dominant or '待识别'}”为主，{('辅以' + secondary) if secondary else '辅助元素待补充'}。",
+            "兴趣、地域和发展建议仅作辅助解释，正式志愿仍需以分数、位次、招生规则和院校章程为核心依据。",
+        ],
+    }
+    return profile, interest_directions, region_preferences, development_goals
+
+
+def _build_autofill(
+    *,
+    constellation: str | None,
+    pillars: dict[str, str | None],
+    interest_directions: list[str],
+    region_preferences: list[str],
+    development_goals: list[str],
+) -> dict[str, Any]:
+    return {
+        "constellation": constellation,
+        "bazi_year_pillar": pillars["year"],
+        "bazi_month_pillar": pillars["month"],
+        "bazi_day_pillar": pillars["day"],
+        "bazi_hour_pillar": pillars["hour"],
+        "interest_preferences": "、".join(interest_directions[:4]) if interest_directions else None,
+        "region_preference": "、".join(region_preferences[:3]) if region_preferences else None,
+        "development_goal": "、".join(development_goals[:3]) if development_goals else None,
+    }
+
+
+def derive_birth_profile_legacy(birthday: str | None, birth_time: str | None = None) -> dict[str, Any]:
+    parsed = parse_birthday(birthday)
+    parsed_time = parse_birth_time(birth_time)
+    if parsed is None:
+        return {
+            "birthday": birthday,
+            "birthTime": birth_time,
+            "birthdayType": "公历",
+            "constellation": None,
+            "pillars": {"year": None, "month": None, "day": None, "hour": None},
+            "wuxing": {"counts": {}, "dominant": None, "secondary": None},
+            "profile": {
+                "personalityTraits": [],
+                "learningStyle": [],
+                "interestDirections": [],
+                "regionPreferences": [],
+                "developmentGoals": [],
+                "explanations": [],
+            },
+            "autofill": {
+                "constellation": None,
+                "bazi_year_pillar": None,
+                "bazi_month_pillar": None,
+                "bazi_day_pillar": None,
+                "bazi_hour_pillar": None,
+                "interest_preferences": None,
+                "region_preference": None,
+                "development_goal": None,
+            },
+            "disclaimer": "请输入阳历生日后再进行辅助推算。",
+        }
+
+    constellation = infer_constellation(birthday)
+    pillars = infer_four_pillars(birthday, birth_time)
+    counts = _collect_elements(pillars)
+    ranked_elements = _dominant_elements(counts)
+    dominant = ranked_elements[0] if ranked_elements else None
+    secondary = ranked_elements[1] if len(ranked_elements) > 1 else None
+    profile, interest_directions, region_preferences, development_goals = _build_profile_sections(
+        constellation=constellation,
+        dominant=dominant,
+        secondary=secondary,
+        parsed_time=parsed_time,
+        pillars=pillars,
+    )
 
     return {
         "birthday": parsed.isoformat(),
@@ -393,24 +437,14 @@ def derive_birth_profile_legacy(birthday: str | None, birth_time: str | None = N
             "dominant": dominant,
             "secondary": secondary,
         },
-        "profile": {
-            "personalityTraits": _merge_unique(dominant_traits, secondary_traits, constellation_traits)[:6],
-            "learningStyle": learning_style,
-            "interestDirections": interest_directions,
-            "regionPreferences": region_preferences,
-            "developmentGoals": development_goals,
-            "explanations": explanations,
-        },
-        "autofill": {
-            "constellation": constellation,
-            "bazi_year_pillar": pillars["year"],
-            "bazi_month_pillar": pillars["month"],
-            "bazi_day_pillar": pillars["day"],
-            "bazi_hour_pillar": pillars["hour"],
-            "interest_preferences": "、".join(interest_directions[:4]) if interest_directions else None,
-            "region_preference": "、".join(region_preferences[:3]) if region_preferences else None,
-            "development_goal": "、".join(development_goals[:3]) if development_goals else None,
-        },
+        "profile": profile,
+        "autofill": _build_autofill(
+            constellation=constellation,
+            pillars=pillars,
+            interest_directions=interest_directions,
+            region_preferences=region_preferences,
+            development_goals=development_goals,
+        ),
         "disclaimer": PORTRAIT_DISCLAIMER,
     }
 
