@@ -1,0 +1,9 @@
+{
+  "name": "metaphysics-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "lunar-javascript": "^1.7.5"
+  }
+}
