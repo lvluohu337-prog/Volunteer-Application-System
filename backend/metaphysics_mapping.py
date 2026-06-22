@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from backend.compliance import PORTRAIT_DISCLAIMER
-from backend.intake_inference import _hour_branch_text, infer_constellation
+from backend.intake_inference import (
+    _collect_elements,
+    _dominant_elements,
+    _hour_branch_text,
+    infer_constellation,
+)
 
 
 def map_bridge_payload_to_profile(
@@ -14,6 +19,10 @@ def map_bridge_payload_to_profile(
 ) -> dict[str, Any]:
     pillars = bridge_payload["pillars"]
     wuxing = bridge_payload.get("wuxing") or {}
+    counts = wuxing.get("counts") or _collect_elements(pillars)
+    ranked_elements = _dominant_elements(counts)
+    dominant = wuxing.get("dominant") or (ranked_elements[0] if ranked_elements else None)
+    secondary = wuxing.get("secondary") or (ranked_elements[1] if len(ranked_elements) > 1 else None)
     return {
         "birthday": birthday,
         "birthTime": birth_time,
@@ -22,9 +31,9 @@ def map_bridge_payload_to_profile(
         "pillars": pillars,
         "hourBranchLabel": _hour_branch_text(bridge_payload.get("normalizedBirthTime") or birth_time),
         "wuxing": {
-            "counts": wuxing.get("counts") or {},
-            "dominant": wuxing.get("dominant"),
-            "secondary": wuxing.get("secondary"),
+            "counts": counts,
+            "dominant": dominant,
+            "secondary": secondary,
         },
         "profile": {
             "personalityTraits": [],
