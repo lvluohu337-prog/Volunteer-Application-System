@@ -297,7 +297,7 @@ def _hour_branch_text(birth_time: str | None) -> str | None:
     return HOUR_BRANCH_LABELS[index]
 
 
-def derive_birth_profile(birthday: str | None, birth_time: str | None = None) -> dict[str, Any]:
+def derive_birth_profile_legacy(birthday: str | None, birth_time: str | None = None) -> dict[str, Any]:
     parsed = parse_birthday(birthday)
     parsed_time = parse_birth_time(birth_time)
     if parsed is None:
@@ -413,3 +413,9 @@ def derive_birth_profile(birthday: str | None, birth_time: str | None = None) ->
         },
         "disclaimer": PORTRAIT_DISCLAIMER,
     }
+
+
+def derive_birth_profile(birthday: str | None, birth_time: str | None = None) -> dict[str, Any]:
+    from backend.metaphysics_profile import derive_birth_profile_v2
+
+    return derive_birth_profile_v2(birthday, birth_time)

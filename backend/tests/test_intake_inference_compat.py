@@ -1,5 +1,7 @@
 import unittest
+from unittest.mock import patch
 
+from backend.intake_inference import derive_birth_profile
 from backend.metaphysics_mapping import map_bridge_payload_to_profile
 
 
@@ -62,3 +64,23 @@ class IntakeInferenceCompatibilityTest(unittest.TestCase):
         self.assertGreater(sum(result["wuxing"]["counts"].values()), 0)
         self.assertTrue(result["wuxing"]["dominant"])
         self.assertTrue(result["wuxing"]["secondary"])
+
+
+class IntakeInferenceDelegationTest(unittest.TestCase):
+    def test_public_derive_birth_profile_delegates_to_v2_engine(self) -> None:
+        with patch(
+            "backend.metaphysics_profile.derive_birth_profile_v2",
+            return_value={
+                "engineVersion": "bazi_lunar_v1",
+                "pillars": {
+                    "year": "year-pillar",
+                    "month": None,
+                    "day": None,
+                    "hour": None,
+                },
+            },
+        ) as mocked:
+            result = derive_birth_profile("2006-06-22", "08:00")
+
+        mocked.assert_called_once()
+        self.assertEqual(result["engineVersion"], "bazi_lunar_v1")

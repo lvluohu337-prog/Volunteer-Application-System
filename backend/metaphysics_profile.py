@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from backend.compliance import PORTRAIT_DISCLAIMER
-from backend.intake_inference import derive_birth_profile as derive_birth_profile_legacy
+from backend.intake_inference import derive_birth_profile_legacy
 from backend.metaphysics_bridge import MetaphysicsBridgeError, run_bazi_bridge
 from backend.metaphysics_mapping import map_bridge_payload_to_profile
 
