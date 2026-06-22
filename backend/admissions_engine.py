@@ -3,13 +3,14 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
-from backend.rules_engine import safe_int, safe_number, split_keywords
+from backend.rules_engine import infer_student_subjects, safe_int, safe_number, split_keywords
 from backend.admissions_risk import (
     _collect_risks,
     _normalize_explicit_rule_v2,
 )
 from backend.admissions_presenter import (
     BUCKET_ORDER,
+    _candidate_risk_level,
     _prepare_recommendation_outputs,
     _rejection_item,
     _unique_rejections,

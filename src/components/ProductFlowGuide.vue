@@ -77,6 +77,14 @@ function handleNavigate(item) {
   padding: 16px;
 }
 
+.product-flow-guide-compact .product-flow-head {
+  flex-direction: column;
+}
+
+.product-flow-guide-compact .product-flow-steps {
+  grid-template-columns: 1fr;
+}
+
 .product-flow-head {
   display: flex;
   justify-content: space-between;
@@ -118,6 +126,25 @@ function handleNavigate(item) {
 .product-flow-step :deep(.el-button) {
   grid-column: 2;
   width: fit-content;
+}
+
+.product-flow-guide-compact .product-flow-step {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.product-flow-guide-compact .step-index {
+  width: 40px;
+  height: 40px;
+}
+
+.product-flow-guide-compact .step-copy {
+  grid-column: 1;
+}
+
+.product-flow-guide-compact .product-flow-step :deep(.el-button) {
+  grid-column: 1;
+  width: 100%;
 }
 
 .product-flow-step-active {

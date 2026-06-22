@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
-from backend.admissions_engine import build_plan_columns_from_candidates
+from backend.admissions_engine import _build_candidate_match_result, build_plan_columns_from_candidates
 from backend.admissions_presenter import _prepare_recommendation_outputs
 from backend.admissions_query import _candidate_pair_clause
 from backend.admissions_scoring import (
@@ -50,6 +51,59 @@ def _candidate(index: int, bucket: str, composite_score: float, risk_level: str 
 
 
 class AdmissionsEngineTest(unittest.TestCase):
+    def test_build_candidate_match_result_assigns_risk_level_for_real_candidates(self):
+        student = {
+            "province": "河南",
+            "subject_group": "物理类",
+        }
+        context = {
+            "province": "河南",
+            "latest_year": 2025,
+            "track_labels": ["物理类"],
+            "track_code": "physics",
+            "score": 602,
+            "rank": 11800,
+        }
+        row = {
+            "institution_id": 1,
+            "major_id": 11,
+            "institution_name": "测试大学",
+            "institution_code": "10001",
+            "major_name": "计算机科学与技术",
+            "major_code": "080901",
+            "institution_city": "郑州",
+            "institution_province": "河南",
+            "min_score": 590,
+            "min_rank": 12600,
+            "planned_count": 12,
+            "latest_plan_count": 12,
+            "batch_code": "本科批",
+            "plan_group_code": "101",
+            "requirement_text": "物理、化学",
+        }
+
+        with (
+            patch("backend.admissions_engine._fetch_candidate_rows", return_value=[row]),
+            patch("backend.admissions_engine._fetch_history_map", return_value={(1, 11): []}),
+            patch("backend.admissions_engine._fetch_explicit_rule_map", return_value={(1, 11): []}),
+        ):
+            result = _build_candidate_match_result(
+                student,
+                context,
+                lambda requirement, subjects, track: {
+                    "status": "match",
+                    "score": 86,
+                    "label": "选科匹配",
+                    "note": "当前选科满足要求。",
+                },
+                10,
+            )
+
+        self.assertEqual(len(result["candidates"]), 1)
+        self.assertEqual(result["candidates"][0]["risk_level"], "medium")
+        self.assertEqual(len(result["recommendation_table"]), 1)
+        self.assertEqual(result["recommendation_table"][0]["riskLevel"], "medium")
+
     def test_query_module_builds_unique_candidate_pair_clause(self):
         rows = [
             {"institution_id": 1, "major_id": 10},
