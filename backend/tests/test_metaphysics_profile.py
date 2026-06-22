@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 
+from backend.metaphysics_bridge import MetaphysicsBridgeError
 from backend.metaphysics_profile import derive_birth_profile_v2
 
 
@@ -51,3 +52,22 @@ class MetaphysicsAccuracyTest(unittest.TestCase):
             result = derive_birth_profile_v2("2006-02-04", "23:40")
         self.assertEqual(result["normalizedBirthDate"], "2006-02-05")
         self.assertIn("late-zi-hour-next-day", result["normalizationNotes"])
+
+
+class MetaphysicsFailurePolicyTest(unittest.TestCase):
+    def test_production_mode_raises_when_bridge_fails(self) -> None:
+        with patch("backend.metaphysics_profile.run_bazi_bridge", side_effect=MetaphysicsBridgeError("bridge down")):
+            with self.assertRaises(MetaphysicsBridgeError):
+                derive_birth_profile_v2("2006-06-22", "08:00", runtime_mode="production")
+
+    def test_explicit_legacy_mode_marks_engine_version(self) -> None:
+        with patch("backend.metaphysics_profile.run_bazi_bridge", side_effect=MetaphysicsBridgeError("bridge down")):
+            result = derive_birth_profile_v2(
+                "2006-06-22",
+                "08:00",
+                runtime_mode="development",
+                fallback_mode="legacy",
+            )
+
+        self.assertEqual(result["engineVersion"], "legacy_fallback")
+        self.assertIn("bridge down", result["normalizationNotes"][0])

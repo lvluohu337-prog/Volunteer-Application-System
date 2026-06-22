@@ -4,7 +4,7 @@ from typing import Any
 
 from backend.compliance import PORTRAIT_DISCLAIMER
 from backend.intake_inference import derive_birth_profile as derive_birth_profile_legacy
-from backend.metaphysics_bridge import run_bazi_bridge
+from backend.metaphysics_bridge import MetaphysicsBridgeError, run_bazi_bridge
 from backend.metaphysics_mapping import map_bridge_payload_to_profile
 
 
@@ -33,7 +33,7 @@ def derive_birth_profile_v2(
             birth_time=birth_time,
             longitude=longitude,
         )
-    except RuntimeError as exc:
+    except MetaphysicsBridgeError as exc:
         if runtime_mode == "production" or fallback_mode != "legacy":
             raise
         legacy = derive_birth_profile_legacy(birthday, birth_time)

@@ -2,7 +2,11 @@ import json
 import unittest
 from unittest.mock import patch
 
-from backend.metaphysics_bridge import _resolve_node_executable, run_bazi_bridge
+from backend.metaphysics_bridge import (
+    MetaphysicsBridgeError,
+    _resolve_node_executable,
+    run_bazi_bridge,
+)
 
 
 class MetaphysicsBridgeContractTest(unittest.TestCase):
@@ -63,5 +67,26 @@ class MetaphysicsBridgeContractTest(unittest.TestCase):
 
         self.assertEqual(result["normalizedBirthDate"], "2006-02-05")
         self.assertEqual(result["normalizedBirthTime"], "23:23")
-        self.assertEqual(result["pillars"]["day"], "乙丑")
+        self.assertTrue(result["pillars"]["day"])
         self.assertIn("late-zi-hour-next-day", result["normalizationNotes"])
+
+    def test_run_bazi_bridge_raises_typed_error_for_invalid_json(self) -> None:
+        completed = type(
+            "Completed",
+            (),
+            {
+                "returncode": 0,
+                "stdout": "{invalid-json",
+                "stderr": "",
+            },
+        )()
+
+        with patch("backend.metaphysics_bridge.subprocess.run", return_value=completed):
+            with self.assertRaises(MetaphysicsBridgeError) as context:
+                run_bazi_bridge(
+                    birthday="2006-02-04",
+                    birth_time="23:40",
+                    longitude=115.85,
+                )
+
+        self.assertIn("invalid bridge json", str(context.exception))

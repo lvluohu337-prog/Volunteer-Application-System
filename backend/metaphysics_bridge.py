@@ -13,6 +13,10 @@ BRIDGE_ENTRY = BRIDGE_DIR / "bridge.mjs"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
+class MetaphysicsBridgeError(RuntimeError):
+    """Raised when the Node metaphysics bridge cannot return a valid payload."""
+
+
 def _candidate_node_paths() -> list[str]:
     env_node = os.environ.get("METAPHYSICS_NODE_BIN")
     bundled = Path.home() / ".cache" / "codex-runtimes" / "codex-primary-runtime" / "dependencies" / "node" / "bin" / "node.exe"
@@ -61,5 +65,9 @@ def run_bazi_bridge(
         check=False,
     )
     if completed.returncode != 0:
-        raise RuntimeError(completed.stderr.strip() or "metaphysics bridge failed")
-    return json.loads(completed.stdout)
+        message = completed.stderr.strip() or completed.stdout.strip() or "metaphysics bridge failed"
+        raise MetaphysicsBridgeError(message)
+    try:
+        return json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise MetaphysicsBridgeError(f"invalid bridge json: {exc}") from exc
