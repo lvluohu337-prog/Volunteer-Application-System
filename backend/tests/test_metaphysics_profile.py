@@ -53,6 +53,57 @@ class MetaphysicsAccuracyTest(unittest.TestCase):
         self.assertEqual(result["normalizedBirthDate"], "2006-02-05")
         self.assertIn("late-zi-hour-next-day", result["normalizationNotes"])
 
+    def test_jieqi_month_boundary_switches_exact_month_pillar(self) -> None:
+        payload = {
+            "engineVersion": "bazi_lunar_v1",
+            "normalizedBirthDate": "2006-03-06",
+            "normalizedBirthTime": "00:30",
+            "trueSolarTime": "00:12",
+            "pillars": {
+                "year": "丙戌",
+                "month": "辛卯",
+                "day": "丙辰",
+                "hour": "戊子",
+            },
+            "wuxing": {
+                "counts": {"木": 2, "火": 2, "土": 2, "金": 1, "水": 1},
+                "dominant": "木",
+                "secondary": "火",
+            },
+            "normalizationNotes": ["jieqi-exact-month"],
+        }
+        with patch("backend.metaphysics_profile.run_bazi_bridge", return_value=payload):
+            result = derive_birth_profile_v2("2006-03-06", "00:30")
+
+        self.assertEqual(result["pillars"]["month"], "辛卯")
+        self.assertIn("jieqi-exact-month", result["normalizationNotes"])
+
+    def test_missing_birth_time_keeps_hour_pillar_none(self) -> None:
+        payload = {
+            "engineVersion": "bazi_lunar_v1",
+            "normalizedBirthDate": "2006-06-22",
+            "normalizedBirthTime": None,
+            "trueSolarTime": None,
+            "pillars": {
+                "year": "丙戌",
+                "month": "甲午",
+                "day": "辛酉",
+                "hour": None,
+            },
+            "wuxing": {
+                "counts": {"木": 1, "火": 2, "土": 1, "金": 3, "水": 1},
+                "dominant": "金",
+                "secondary": "火",
+            },
+            "normalizationNotes": [],
+        }
+        with patch("backend.metaphysics_profile.run_bazi_bridge", return_value=payload):
+            result = derive_birth_profile_v2("2006-06-22", None)
+
+        self.assertIsNone(result["birthTime"])
+        self.assertIsNone(result["pillars"]["hour"])
+        self.assertIsNone(result["normalizedBirthTime"])
+
 
 class MetaphysicsFailurePolicyTest(unittest.TestCase):
     def test_production_mode_raises_when_bridge_fails(self) -> None:

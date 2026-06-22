@@ -90,3 +90,24 @@ class MetaphysicsBridgeContractTest(unittest.TestCase):
                 )
 
         self.assertIn("invalid bridge json", str(context.exception))
+
+    def test_run_bazi_bridge_raises_typed_error_for_nonzero_exit(self) -> None:
+        completed = type(
+            "Completed",
+            (),
+            {
+                "returncode": 1,
+                "stdout": "",
+                "stderr": "bridge failed on exact-jieqi lookup",
+            },
+        )()
+
+        with patch("backend.metaphysics_bridge.subprocess.run", return_value=completed):
+            with self.assertRaises(MetaphysicsBridgeError) as context:
+                run_bazi_bridge(
+                    birthday="2006-06-22",
+                    birth_time="08:00",
+                    longitude=115.85,
+                )
+
+        self.assertIn("bridge failed on exact-jieqi lookup", str(context.exception))
