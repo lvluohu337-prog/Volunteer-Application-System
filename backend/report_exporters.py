@@ -314,31 +314,25 @@ def _build_group_and_codes_text(item: dict[str, object]) -> str:
 
 def _build_first_choice_table_block(item: dict[str, object]) -> ReportBlock:
     headers = (
-        "院校 / 专业 / 城市",
+        "院校",
+        "专业",
         "专业组 / 代码",
-        "最低分",
-        "最低位次",
-        "位次差",
-        "风险等级",
-        "推荐定位",
+        "城市",
+        "最低分 / 位次",
+        "录取概率",
+        "风险提示",
     )
-    location_text = str(item.get("cityText") or item.get("city") or item.get("province") or "-")
-    reason_text = str(item.get("recommendationReason") or "当前适合作为第一志愿主力样本。").strip()
     return ReportBlock(
         "table",
         table_headers=headers,
         table_rows=(
-            (
-                f"{item.get('institutionName') or '目标院校'} / {item.get('majorName') or '目标专业'} / {location_text}",
-                _build_group_and_codes_text(item),
-                _format_number(item.get("minScore")) if item.get("minScore") not in (None, "") else "-",
-                _format_number(item.get("minRank")) if item.get("minRank") not in (None, "") else "-",
-                str(item.get("rankGap") or "-"),
-                str(item.get("riskLabel") or "-"),
-                reason_text,
+            _build_core_recommendation_row(
+                item,
+                fallback_probability="建议优先关注",
+                fallback_risk="当前适合作为第一志愿主力样本，但提交前仍需核对专业组和调剂边界。",
             ),
         ),
-        table_column_widths=(140.0, 88.0, 42.0, 54.0, 48.0, 48.0, 95.28),
+        table_column_widths=(84.0, 84.0, 94.0, 48.0, 80.0, 56.0, 105.28),
     )
 
 
@@ -372,35 +366,88 @@ def _build_alternatives_table_block(items: list[dict[str, object]]) -> ReportBlo
 
 def _build_recommendation_table_block(items: list[dict[str, object]]) -> ReportBlock:
     headers = (
-        "院校 / 专业 / 城市",
+        "院校",
+        "专业",
         "专业组 / 代码",
-        "最低分",
-        "最低位次",
-        "位次差",
-        "风险等级",
-        "推荐理由",
+        "城市",
+        "最低分 / 位次",
+        "录取概率",
+        "风险提示",
     )
     rows: list[tuple[str, ...]] = []
     for item in items:
-        location_text = str(item.get("cityText") or item.get("city") or item.get("province") or "-")
-        reason_text = str(item.get("recommendationReason") or item.get("riskSummary") or "待补充推荐理由").strip()
-        rows.append(
-            (
-                f"{item.get('institutionName') or '目标院校'} / {item.get('majorName') or '目标专业'} / {location_text}",
-                _build_group_and_codes_text(item),
-                _format_number(item.get("minScore")) if item.get("minScore") not in (None, "") else "-",
-                _format_number(item.get("minRank")) if item.get("minRank") not in (None, "") else "-",
-                str(item.get("rankGap") or "-"),
-                str(item.get("riskLabel") or "-"),
-                reason_text,
-            )
-        )
+        rows.append(_build_core_recommendation_row(item))
     return ReportBlock(
         "table",
         table_headers=headers,
         table_rows=tuple(rows),
-        table_column_widths=(140.0, 88.0, 42.0, 54.0, 48.0, 48.0, 95.28),
+        table_column_widths=(84.0, 84.0, 94.0, 48.0, 80.0, 56.0, 105.28),
     )
+
+
+def _build_core_recommendation_row(
+    item: dict[str, object],
+    *,
+    fallback_probability: str = "-",
+    fallback_risk: str = "正式填报前仍需逐校核对招生章程、计划变化和调剂规则。",
+) -> tuple[str, ...]:
+    return (
+        _build_institution_text(item),
+        _build_major_text(item),
+        _build_group_and_codes_text(item),
+        _build_city_text(item),
+        _build_score_rank_text(item),
+        _build_probability_text(item, fallback=fallback_probability),
+        _build_core_risk_text(item, fallback=fallback_risk),
+    )
+
+
+def _build_institution_text(item: dict[str, object]) -> str:
+    return str(item.get("institutionName") or "目标院校").strip() or "目标院校"
+
+
+def _build_major_text(item: dict[str, object]) -> str:
+    return str(item.get("majorName") or "目标专业").strip() or "目标专业"
+
+
+def _build_city_text(item: dict[str, object]) -> str:
+    return str(item.get("cityText") or item.get("city") or item.get("province") or "-").strip() or "-"
+
+
+def _build_score_rank_text(item: dict[str, object]) -> str:
+    score_text = _format_number(item.get("minScore")) if item.get("minScore") not in (None, "") else "-"
+    rank_text = _format_number(item.get("minRank")) if item.get("minRank") not in (None, "") else "-"
+    return f"{score_text} / {rank_text}"
+
+
+def _build_probability_text(item: dict[str, object], *, fallback: str) -> str:
+    probability = str(item.get("probabilityLabel") or "").strip()
+    if probability:
+        return probability
+    return fallback
+
+
+def _build_core_risk_text(item: dict[str, object], *, fallback: str) -> str:
+    risk_parts: list[str] = []
+    risk_label = str(item.get("riskLabel") or "").strip()
+    plan_risk_label = str(item.get("planRiskLabel") or "").strip()
+    recommendation_reason = str(item.get("recommendationReason") or "").strip()
+    subject_label = str(item.get("subjectLabel") or "").strip()
+
+    if risk_label:
+        risk_parts.append(risk_label)
+    if plan_risk_label and plan_risk_label != risk_label:
+        risk_parts.append(plan_risk_label)
+    if recommendation_reason:
+        risk_parts.append(recommendation_reason)
+    elif fallback:
+        risk_parts.append(fallback)
+    if subject_label:
+        risk_parts.append(subject_label)
+
+    if not risk_parts:
+        return fallback
+    return "；".join(dict.fromkeys(risk_parts))
 
 
 def _build_recommendation_summary(item: dict[str, object], *, include_bucket: bool) -> str:
