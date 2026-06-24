@@ -5,19 +5,31 @@
 ## 推荐阅读顺序
 
 1. `总体架构说明_同事版_2026-06-17.md`：理解产品预期、双阶段流程、三档产品和合规边界。
-2. `重构执行与架构对齐记录_2026-06-18.md`：理解第一轮重构如何对齐架构，以及 Step 5A-5C 的结果。
-3. `refactor_execution_update_2026-06-18.md`：理解最近一轮 ReportsPage、admissions_engine 和首次进入产品流改造。
-4. `系统目标差距分析.md`、`志愿报告功能差距分析.md`：理解当前系统与商业化目标之间的差距。
-5. 数据类台账：确认真实数据覆盖、导入和恢复方式。
+2. `推广老师沟通说明_2026-06-24.md`：面向推广老师、招生转化和家长沟通，快速了解系统功能、宣传口径和合规边界。
+3. `2026-06-23-structured-report-export-design.md` / `2026-06-23-structured-report-export-implementation-plan.md`：理解最新结构化 PDF / Word 导出能力。
+4. `重构执行与架构对齐记录_2026-06-18.md`：理解第一轮重构如何对齐架构，以及 Step 5A-5C 的结果。
+5. `refactor_execution_update_2026-06-18.md`：理解 ReportsPage、admissions_engine 和首次进入产品流改造。
+6. `系统目标差距分析.md`、`志愿报告功能差距分析.md`：理解当前系统与商业化目标之间的剩余差距。
+7. 数据类台账：确认真实数据覆盖、导入和恢复方式。
 
 ## 架构与目标
 
 | 文档 | 用途 | 当前定位 |
 |---|---|---|
 | `总体架构说明_同事版_2026-06-17.md` | 同事提供的预期总体架构说明 | 产品与架构参考基线 |
+| `推广老师沟通说明_2026-06-24.md` | 给推广老师讲清楚系统功能、演示路线、宣传话术和禁止承诺 | 当前推广沟通入口 |
 | `系统目标差距分析.md` | 系统目标、现状和差距 | 历史差距分析，仍可参考 |
 | `志愿报告功能差距分析.md` | 志愿报告能力缺口 | 报告产品完善参考 |
 | `数据整理与正式版落地清单.md` | 正式版落地前的数据与产品清单 | 交付准备参考 |
+
+## 最新产品化设计
+
+| 文档 | 用途 | 当前定位 |
+|---|---|---|
+| `superpowers/specs/2026-06-22-metaphysics-engine-design.md` | 精确四柱 / 命理画像引擎设计 | 画像引擎 Phase 1 设计依据 |
+| `superpowers/plans/2026-06-22-metaphysics-engine-implementation-plan.md` | 命理画像引擎实施计划 | 已执行的 Phase 1 计划记录 |
+| `superpowers/specs/2026-06-23-structured-report-export-design.md` | 7 列结构化正式报告导出设计 | PDF / Word 推荐表导出依据 |
+| `superpowers/plans/2026-06-23-structured-report-export-implementation-plan.md` | 结构化报告导出实施计划 | 已执行的导出升级计划记录 |
 
 ## 重构与执行记录
 

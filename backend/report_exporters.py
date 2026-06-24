@@ -82,15 +82,14 @@ def _build_report_blocks(
     title = str(report_data.get("reportTitle") or "志愿规划报告")
     subtitle = str(report_data.get("reportSubtitle") or "")
     product_label = str(report_data.get("activeProductLabel") or "报告版本")
-    export_meta = f"导出版本：{product_label}    导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    if reviewed_by:
-        export_meta += f"    导出人：{reviewed_by}"
-
     blocks = [
         ReportBlock("title", title),
         ReportBlock("meta", subtitle),
-        ReportBlock("meta", export_meta),
+        ReportBlock("meta", f"导出版本：{product_label}"),
+        ReportBlock("meta", f"导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"),
     ]
+    if reviewed_by:
+        blocks.append(ReportBlock("meta", f"导出人：{reviewed_by}"))
 
     _append_structured_recommendation_blocks(blocks, report_data)
 
@@ -332,7 +331,7 @@ def _build_first_choice_table_block(item: dict[str, object]) -> ReportBlock:
                 fallback_risk="当前适合作为第一志愿主力样本，但提交前仍需核对专业组和调剂边界。",
             ),
         ),
-        table_column_widths=(84.0, 84.0, 94.0, 48.0, 80.0, 56.0, 105.28),
+        table_column_widths=(72.0, 72.0, 80.0, 44.0, 70.0, 48.0, 105.28),
     )
 
 
@@ -381,7 +380,7 @@ def _build_recommendation_table_block(items: list[dict[str, object]]) -> ReportB
         "table",
         table_headers=headers,
         table_rows=tuple(rows),
-        table_column_widths=(84.0, 84.0, 94.0, 48.0, 80.0, 56.0, 105.28),
+        table_column_widths=(72.0, 72.0, 80.0, 44.0, 70.0, 48.0, 105.28),
     )
 
 
@@ -1007,15 +1006,22 @@ def _build_pdf_bytes(page_streams: list[str]) -> bytes:
 
 
 def _pdf_text_command(text: str, *, x: float, y: float, font_size: float, color_command: str) -> str:
-    hex_text = text.encode("utf-16-be").hex().upper()
-    return (
-        "BT\n"
-        f"/F1 {font_size:.2f} Tf\n"
-        f"{color_command}\n"
-        f"1 0 0 1 {x:.2f} {y:.2f} Tm\n"
-        f"<{hex_text}> Tj\n"
-        "ET"
-    )
+    cursor_x = x
+    commands = [
+        "BT\n",
+        f"/F1 {font_size:.2f} Tf\n",
+        f"{color_command}\n",
+    ]
+    for char in str(text):
+        if char in "\r\n":
+            continue
+        render_char = " " if char.isspace() else char
+        hex_text = render_char.encode("utf-16-be").hex().upper()
+        commands.append(f"1 0 0 1 {cursor_x:.2f} {y:.2f} Tm\n")
+        commands.append(f"<{hex_text}> Tj\n")
+        cursor_x += _char_display_units(char) * font_size
+    commands.append("ET")
+    return "".join(commands)
 
 
 def _split_block_lines(text: str) -> list[str]:

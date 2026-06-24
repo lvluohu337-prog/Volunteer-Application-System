@@ -13,7 +13,17 @@ sys.path.insert(0, str(PROJECT_ROOT / "data_assets" / "vendor"))
 
 from pypdf import PdfReader
 
-from backend.report_exporters import export_report_docx, export_report_pdf
+from backend.report_exporters import (
+    PDF_MARGIN_LEFT,
+    PDF_MARGIN_RIGHT,
+    PDF_PAGE_WIDTH,
+    _build_first_choice_table_block,
+    _build_recommendation_table_block,
+    _build_report_blocks,
+    _pdf_text_command,
+    export_report_docx,
+    export_report_pdf,
+)
 from backend.tests.report_export_fixtures import build_minimal_report_data
 
 
@@ -55,6 +65,40 @@ class ReportExporterUnitTest(unittest.TestCase):
         self.assertIn("合规提示", extracted_text)
         self.assertIn("保录", extracted_text)
         self.assertIn("咨询师签字", extracted_text)
+
+    def test_report_blocks_split_export_meta_into_multiple_lines(self):
+        blocks = _build_report_blocks(
+            build_minimal_report_data(),
+            reviewed_by="测试老师",
+            include_signature=False,
+        )
+
+        meta_texts = [block.text for block in blocks[:5] if block.style == "meta"]
+        self.assertIn("河南 2026 届高考考生 / 399 报告预览", meta_texts)
+        self.assertIn("导出版本：399 元标准版报告", meta_texts)
+        self.assertIn("导出人：测试老师", meta_texts)
+        self.assertTrue(any(text.startswith("导出时间：") for text in meta_texts))
+
+    def test_core_pdf_tables_fit_within_page_width(self):
+        report_data = build_minimal_report_data()
+        recommendation_block = _build_recommendation_table_block(report_data["recommendationTable"])
+        first_choice_block = _build_first_choice_table_block(report_data["firstChoice"])
+        usable_width = PDF_PAGE_WIDTH - PDF_MARGIN_LEFT - PDF_MARGIN_RIGHT
+
+        self.assertLessEqual(sum(recommendation_block.table_column_widths), usable_width)
+        self.assertLessEqual(sum(first_choice_block.table_column_widths), usable_width)
+
+    def test_pdf_text_command_positions_mixed_script_text_per_character(self):
+        command = _pdf_text_command(
+            "导出时间：2026-06-23 11:22:20",
+            x=52.0,
+            y=760.0,
+            font_size=10.5,
+            color_command="0 0 0 rg",
+        )
+
+        self.assertGreater(command.count(" Tj"), 5)
+        self.assertGreater(command.count(" Tm"), 5)
 
     def test_export_report_docx_generates_real_docx(self):
         artifact_path = self.temp_dir / "sample.docx"

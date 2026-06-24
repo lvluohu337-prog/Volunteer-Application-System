@@ -199,7 +199,6 @@ curl.exe "http://127.0.0.1:8000/api/foundation/majors"
 curl.exe "http://127.0.0.1:8000/api/foundation/cities"
 curl.exe "http://127.0.0.1:8000/api/foundation/sample-students"
 curl.exe "http://127.0.0.1:8000/api/foundation/report-template-fields"
-curl.exe "http://127.0.0.1:8000/api/foundation/admissions-schema"
 ```
 
 ### 6.2 获取可用学生 ID
@@ -228,16 +227,7 @@ curl.exe "http://127.0.0.1:8000/api/reports/student/{studentId}?product_code=399
 - `/api/plans/student/{studentId}` 是否返回 `columns`
 - `/api/reports/student/{studentId}` 是否返回 `outline`、`sections`、`reportJson`
 
-### 6.4 demo 报告接口
-
-```bash
-curl.exe "http://127.0.0.1:8000/api/demo-reports/99?sample_student_id=1"
-curl.exe "http://127.0.0.1:8000/api/demo-reports/399?sample_student_id=1"
-```
-
-这两条接口仍然保留，适合快速验证样例学生驱动的演示报告。
-
-### 6.5 咨询师备注接口
+### 6.4 咨询师备注接口
 
 ```powershell
 $body = @{
@@ -260,7 +250,7 @@ Invoke-RestMethod `
 - 返回 `200`
 - 刷新报告接口后，`advisorNotes` 数组长度增加
 
-### 6.6 导出接口
+### 6.5 导出接口
 
 ```powershell
 $body = @{
@@ -334,17 +324,14 @@ Invoke-RestMethod `
 - 咨询师备注可保存
 - 导出后可看到新的交付记录
 
-### 7.4 基础数据与 demo 页面
+### 7.4 基础数据页面
 
 - `/base-data`
-- `/demo-reports`
-- `/settings`
 
 检查点：
 
 - 基础数据页能看到 4 类基础导入数据
-- demo 页面仍能基于样例学生生成 99/399 演示报告
-- 设置页能正常加载后端返回内容
+- 样例学生、专业大类、城市产业和报告模板字段能正常加载
 
 ### 7.5 前端断接口错误态回归
 
@@ -472,20 +459,20 @@ npm run test:product-flow:e2e
 
 ## 9. 当前已验证事实
 
-截至 2026-05-29，仓库现状可以确认：
+截至 2026-06-24，仓库现状可以确认：
 
 - 默认数据库引擎为 `PostgreSQL`
 - 招生核心表共 `11` 张，除 `province_batches` 外均已有数据
 - 真实学生报告链路已可返回 `reportJson`
 - 咨询师备注、导出留痕、正式交付文件目录均已接通
-- demo 报告链路仍保留可用
+- 报告页已支持正式推荐表、第一志愿建议、99 / 399 / 999 产品口径切换
+- PDF / Word 导出已支持 7 列结构化推荐表
 
 当前仍未覆盖的质量空白：
 
 - 还没有完整的前端组件单测框架
 - 没有导入回归测试
-- 没有规则引擎断言测试
-- 没有最终版 PDF/Word 渲染验收流程
+- 最终版 PDF / Word 还缺稳定的视觉渲染验收流程
 
 ---
 
@@ -504,7 +491,7 @@ npm run test:product-flow:e2e
 
 - 先跑 `python -m backend.scripts.import_henan_admissions_data`
 - 再跑 `python -m backend.scripts.import_henan_policy_rules`
-- 用 `/api/foundation/admissions-schema` 检查各表 `row_count`
+- 用数据库只读查询或导入摘要文件检查核心表 `row_count`
 
 ### 3) 报告导出成功了，但目录里不是 `.pdf` 或 `.docx`
 
