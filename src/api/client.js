@@ -62,7 +62,7 @@ function parseContentDispositionFilename(headerValue) {
   return plainMatch?.[1] ?? "";
 }
 
-function triggerBrowserDownload(blob, filename) {
+function triggerBrowserDownload(blob, filename, { previewInNewTab = false } = {}) {
   const objectUrl = window.URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = objectUrl;
@@ -71,7 +71,12 @@ function triggerBrowserDownload(blob, filename) {
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
-  window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000);
+
+  if (previewInNewTab) {
+    window.open(objectUrl, "_blank", "noopener,noreferrer");
+  }
+
+  window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), previewInNewTab ? 60000 : 1000);
 }
 
 function resolveResponsePayload(payload, unwrapData = true) {
@@ -169,6 +174,7 @@ export async function downloadRequest(path, options = {}) {
     body,
     method = body ? "POST" : "GET",
     filename,
+    previewInNewTab = false,
     ...fetchOptions
   } = options;
 
@@ -196,7 +202,7 @@ export async function downloadRequest(path, options = {}) {
     parseContentDispositionFilename(response.headers.get("Content-Disposition")) ||
     "download";
 
-  triggerBrowserDownload(blob, resolvedFilename);
+  triggerBrowserDownload(blob, resolvedFilename, { previewInNewTab });
 
   return {
     filename: resolvedFilename,

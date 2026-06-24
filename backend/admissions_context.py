@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from backend.database import db_session
+from backend.admissions_strategy import resolve_strategy_mode
 from backend.rules_engine import infer_student_subjects, safe_int, safe_number
 
 
@@ -353,5 +354,6 @@ def build_admissions_context(student: dict[str, Any]) -> dict[str, Any]:
         "rank": rank,
         "rank_source": rank_source,
         "estimated_rank": estimated_rank,
+        "admissions_strategy_mode": resolve_strategy_mode(student.get("strategy_type")),
         **batch_context,
     }

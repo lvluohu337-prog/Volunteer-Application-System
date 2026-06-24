@@ -9,6 +9,55 @@ _MINIMAL_REPORT_DATA = {
     "reportTitle": "胡祥荟 志愿规划报告",
     "reportSubtitle": "河南 2026 届高考考生 / 399 报告预览",
     "activeProductLabel": "399 元标准版报告",
+    "ruleSummary": {
+        "scoreLevel": "可冲可稳",
+        "scoreComment": "当前有效总分 612，位次 12543，适合采用稳妥型策略。",
+        "riskLevel": "medium",
+        "riskItems": ["计划波动需要复核", "调剂边界需要确认"],
+        "topRisks": ["计划波动需要复核", "调剂边界需要确认"],
+        "matchedCount": 48,
+        "latestAdmissionYear": 2025,
+        "rankSource": "official",
+        "strategy": {
+            "name": "稳妥型",
+            "total_choice_target": 48,
+            "note": "险5 / 冲5 / 稳16 / 保12 / 垫5 / 兜5",
+        },
+        "finalConclusion": "建议采用稳妥型，围绕 48 个院校专业组形成正式方案。第一志愿优先关注 郑州大学 - 自动化类，正式填报前继续复核招生章程、组内专业接受度和调剂边界。",
+        "reviewChecklist": [
+            "招生章程",
+            "组内 6 个专业接受度",
+            "是否服从调剂",
+            "体检/单科/语种/性别限制",
+            "当年招生计划变化",
+            "最终志愿系统录入顺序",
+        ],
+    },
+    "resultSource": {
+        "mode": "real",
+        "label": "真实招生结果",
+        "isRealData": True,
+        "matchedCandidateCount": 48,
+        "rankSource": "official",
+        "latestAdmissionYear": 2025,
+    },
+    "portraitRecommendation": {
+        "preferredDirection": "自动化与智能制造",
+        "recommendedMajorDirections": ["自动化类", "计算机科学与技术", "电子信息类"],
+        "parentConcernMatch": {
+            "details": "家庭关注就业稳定性与省内发展路径，本方案优先保留郑州及周边产业资源。"
+        },
+    },
+    "reportJson": {
+        "studentSnapshot": {
+            "name": "胡祥荟",
+            "province": "河南",
+            "examYear": 2026,
+            "subjectGroup": "物理类",
+            "totalScore": 612,
+            "rank": 12543,
+        }
+    },
     "recommendationTable": [
         {
             "bucket": "steady",

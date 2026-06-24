@@ -40,13 +40,15 @@ def _evaluate_rank_bucket(student_rank: int | None, row: dict[str, Any]) -> dict
         return {"bucket": "rush", "score": 66, "label": "位次待复核", "note": "位次信息不完整，先按谨慎可冲处理。"}
 
     margin = min_rank - student_rank
-    margin_pct = margin / max(min_rank, 1)
+    margin_pct = margin / max(student_rank, 1)
 
-    if margin_pct >= 0.16 or margin >= 5000:
+    if margin_pct >= 0.20:
+        return {"bucket": "safe", "score": 97, "label": "位次保底", "note": "学生当前位次大幅优于近年最低录取位次，可作为保底层候选。"}
+    if margin_pct >= 0.10:
         return {"bucket": "safe", "score": 95, "label": "位次安全", "note": "学生当前位次明显优于近年最低录取位次。"}
-    if margin_pct >= 0.05 or margin >= 1200:
+    if margin_pct >= -0.05:
         return {"bucket": "steady", "score": 84, "label": "位次稳妥", "note": "学生当前位次略优于近年最低录取位次，适合稳妥关注。"}
-    if margin_pct >= -0.08 or margin >= -1800:
+    if margin_pct >= -0.10:
         return {"bucket": "rush", "score": 70, "label": "位次可冲", "note": "学生当前位次接近往年门槛，可作为冲刺尝试。"}
     return {"bucket": "out", "score": 35, "label": "位次压力大", "note": "学生当前位次明显落后于往年门槛，正式填报风险较高。"}
 

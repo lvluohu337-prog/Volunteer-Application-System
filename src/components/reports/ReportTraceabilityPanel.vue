@@ -42,7 +42,14 @@ const emit = defineEmits(["submit-note", "download-record", "update-note-field"]
 </script>
 
 <template>
-  <section class="traceability-grid">
+  <section class="traceability-panel" aria-labelledby="traceability-title">
+    <header class="traceability-panel-head">
+      <span>报告作业区</span>
+      <h2 id="traceability-title">交付留痕与顾问补充</h2>
+      <p>以下内容用于顾问复核、文件导出和过程归档，不作为家长阅读正式结论的第一层信息。</p>
+    </header>
+
+    <div class="traceability-grid">
     <article class="traceability-card">
       <header class="traceability-head">
         <strong>咨询师补充备注</strong>
@@ -154,10 +161,39 @@ const emit = defineEmits(["submit-note", "download-record", "update-note-field"]
       </div>
       <p v-else class="table-note">当前还没有导出记录，正式导出后会自动留痕。</p>
     </article>
+    </div>
   </section>
 </template>
 
 <style scoped>
+.traceability-panel {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.traceability-panel-head {
+  margin-bottom: 14px;
+}
+
+.traceability-panel-head span {
+  color: #667085;
+  font-size: 13px;
+}
+
+.traceability-panel-head h2 {
+  margin: 4px 0 0;
+  color: #111827;
+  font-size: 20px;
+}
+
+.traceability-panel-head p {
+  max-width: 760px;
+  margin: 8px 0 0;
+  color: #667085;
+  line-height: 1.7;
+}
+
 .traceability-grid {
   display: grid;
   gap: 12px;
@@ -166,9 +202,9 @@ const emit = defineEmits(["submit-note", "download-record", "update-note-field"]
 
 .traceability-card {
   padding: 18px;
-  border-radius: 20px;
-  border: 1px solid rgba(66, 133, 244, 0.12);
-  background: linear-gradient(180deg, rgba(66, 133, 244, 0.06), rgba(66, 133, 244, 0.02));
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #f8fafc;
 }
 
 .traceability-head {
@@ -201,9 +237,9 @@ const emit = defineEmits(["submit-note", "download-record", "update-note-field"]
 
 .trace-item {
   padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(66, 133, 244, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .trace-item-head {

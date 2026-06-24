@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import shutil
 import sys
 import tempfile
@@ -17,7 +18,9 @@ from backend.report_exporters import (
     PDF_MARGIN_LEFT,
     PDF_MARGIN_RIGHT,
     PDF_PAGE_WIDTH,
+    ReportBlock,
     _build_first_choice_table_block,
+    _build_pdf_page_streams,
     _build_recommendation_table_block,
     _build_report_blocks,
     _pdf_text_command,
@@ -49,6 +52,8 @@ class ReportExporterUnitTest(unittest.TestCase):
 
         reader = PdfReader(str(artifact_path))
         self.assertGreaterEqual(len(reader.pages), 1)
+        metadata = reader.metadata or {}
+        self.assertIn("ReportLab", metadata.get("/Producer", ""))
         extracted_text = "\n".join(page.extract_text() or "" for page in reader.pages)
         self.assertIn("正式院校专业推荐表", extracted_text)
         self.assertIn("院校", extracted_text)
@@ -79,6 +84,67 @@ class ReportExporterUnitTest(unittest.TestCase):
         self.assertIn("导出人：测试老师", meta_texts)
         self.assertTrue(any(text.startswith("导出时间：") for text in meta_texts))
 
+    def test_report_blocks_start_with_formal_cover_and_personalized_evidence(self):
+        blocks = _build_report_blocks(
+            build_minimal_report_data(),
+            reviewed_by="测试老师",
+            include_signature=False,
+        )
+        texts = [block.text for block in blocks if block.text]
+        joined = "\n".join(texts)
+        headings = [block.text for block in blocks if block.style == "heading"]
+
+        self.assertEqual(blocks[0].text, "河南 2026 高考志愿正式规划报告")
+        self.assertIn("个人决策画像摘要", headings)
+        self.assertIn("本报告核心结论", headings)
+        self.assertIn("为什么适合该学生", headings)
+        self.assertIn("证据链与复核清单", headings)
+        self.assertIn("胡祥荟", joined)
+        self.assertIn("河南 / 2026 届 / 物理类", joined)
+        self.assertIn("总分 612", joined)
+        self.assertIn("位次 12543", joined)
+        self.assertIn("稳妥型", joined)
+        self.assertIn("郑州大学 - 自动化类", joined)
+        self.assertIn("真实招生候选 48 条", joined)
+        self.assertIn("组内 6 个专业接受度", joined)
+
+    def test_report_blocks_put_formal_plan_after_page_break(self):
+        blocks = _build_report_blocks(
+            build_minimal_report_data(),
+            reviewed_by="测试老师",
+            include_signature=False,
+        )
+        plan_index = next(index for index, block in enumerate(blocks) if block.text == "正式院校专业推荐表")
+
+        self.assertEqual(blocks[plan_index - 1].style, "page_break")
+
+    def test_report_blocks_group_recommendations_by_six_display_tiers(self):
+        report_data = build_minimal_report_data()
+        base_item = report_data["recommendationTable"][0]
+        tiers = [
+            ("risk", "险中尝试"),
+            ("sprint", "冲刺推荐"),
+            ("steady", "稳妥主力"),
+            ("protect", "保底承接"),
+            ("cushion", "垫底缓冲"),
+            ("fallback", "兜底守线"),
+        ]
+        report_data["recommendationTable"] = [
+            {
+                **base_item,
+                "institutionName": f"{title}大学",
+                "displayTier": key,
+                "displayTierTitle": title,
+            }
+            for key, title in tiers
+        ]
+
+        blocks = _build_report_blocks(report_data, reviewed_by="测试老师", include_signature=False)
+        headings = [block.text for block in blocks if block.style == "heading"]
+
+        for _, title in tiers:
+            self.assertIn(title, headings)
+
     def test_core_pdf_tables_fit_within_page_width(self):
         report_data = build_minimal_report_data()
         recommendation_block = _build_recommendation_table_block(report_data["recommendationTable"])
@@ -87,6 +153,31 @@ class ReportExporterUnitTest(unittest.TestCase):
 
         self.assertLessEqual(sum(recommendation_block.table_column_widths), usable_width)
         self.assertLessEqual(sum(first_choice_block.table_column_widths), usable_width)
+
+    def test_pdf_table_does_not_orphan_header_at_page_bottom(self):
+        report_data = build_minimal_report_data()
+        filler = ReportBlock("body", "\n".join(["填充内容"] * 35))
+        recommendation_block = _build_recommendation_table_block(report_data["recommendationTable"])
+
+        page_streams = _build_pdf_page_streams([filler, recommendation_block])
+
+        self.assertGreaterEqual(len(page_streams), 2)
+        self.assertNotIn("院".encode("utf-16-be").hex().upper(), page_streams[0])
+        self.assertIn("院".encode("utf-16-be").hex().upper(), page_streams[1])
+
+    def test_pdf_table_leaves_readable_gap_before_following_text(self):
+        report_data = build_minimal_report_data()
+        recommendation_block = _build_recommendation_table_block(report_data["recommendationTable"])
+        page_stream = _build_pdf_page_streams([recommendation_block, ReportBlock("body", "表后说明")])[0]
+
+        rectangle_matches = re.findall(r" ([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+) re B Q", page_stream)
+        table_bottom = min(float(match[1]) for match in rectangle_matches)
+        marker_hex = "表".encode("utf-16-be").hex().upper()
+        marker_match = re.search(rf"1 0 0 1 [0-9.]+ ([0-9.]+) Tm\n<{marker_hex}> Tj", page_stream)
+
+        self.assertIsNotNone(marker_match)
+        marker_y = float(marker_match.group(1))
+        self.assertLessEqual(marker_y, table_bottom - 14.0)
 
     def test_pdf_text_command_positions_mixed_script_text_per_character(self):
         command = _pdf_text_command(
@@ -118,7 +209,8 @@ class ReportExporterUnitTest(unittest.TestCase):
             self.assertIn("word/document.xml", names)
             document_xml = archive.read("word/document.xml").decode("utf-8")
 
-        self.assertIn("胡祥荟 志愿规划报告", document_xml)
+        self.assertIn("河南 2026 高考志愿正式规划报告", document_xml)
+        self.assertIn("胡祥荟：河南 / 2026 届 / 物理类", document_xml)
         self.assertIn("<w:tbl>", document_xml)
         self.assertIn("正式院校专业推荐表", document_xml)
         self.assertIn("院校", document_xml)

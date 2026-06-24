@@ -178,7 +178,7 @@ def export_report_package(
         "reviewedBy": reviewed_by,
         "includeSignature": include_signature,
         "artifactType": "final_document",
-        "renderEngine": "builtin_pdf_renderer" if export_format == "pdf" else "builtin_docx_renderer",
+        "renderEngine": "reportlab_pdf_renderer" if export_format == "pdf" else "builtin_docx_renderer",
         "note": "当前阶段已直接生成正式交付文件，可用于归档、发送与线下讲解交付。",
     }
     delivery_record = create_report_delivery_record(

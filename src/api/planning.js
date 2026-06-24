@@ -227,12 +227,13 @@ export async function exportReportWord(studentId, params = {}) {
   });
 }
 
-export async function downloadReportDelivery(studentId, recordId, artifactName = "") {
+export async function downloadReportDelivery(studentId, recordId, artifactName = "", options = {}) {
   return downloadRequest(
     createPath(API_ENDPOINTS.reports.deliveryDownload.path, { studentId, recordId }),
     {
       method: API_ENDPOINTS.reports.deliveryDownload.method,
-      filename: artifactName || undefined
+      filename: artifactName || undefined,
+      previewInNewTab: options.previewInNewTab ?? false
     }
   );
 }

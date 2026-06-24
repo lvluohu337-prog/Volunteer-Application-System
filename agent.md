@@ -1079,3 +1079,479 @@
 - Result:
   - Current source/documentation version has been pushed to GitHub `origin/main`.
   - Only local generated artifacts remain untracked; they were not included in the cloud push.
+
+### Task 46: Explain how to optimize the rush-steady-safe algorithm
+
+- Time: 2026-06-24
+- Request: User asked how the current admissions recommendation algorithm should be optimized after confirming the 2026 Henan policy mismatch with the online 96-choice example.
+- Actions:
+  1. Re-read `agent.md` and `C:\Users\lenovo\.codex\RTK.md`.
+  2. Reframed the algorithm direction as a strategy upgrade rather than a simple threshold replacement.
+  3. Prepared an implementation-oriented explanation covering hard filters, rank bands, 48 college-major-group allocation, stability correction, plan-count correction, and explainable scoring.
+- Result:
+  - Recommended optimizing toward a configurable Henan 2026 strategy engine: hard eligibility filters first, rank-band bucket assignment second, policy/plan/stability risk correction third, and final 48-group output with group-internal major ordering.
+
+### Task 47: Upgrade admissions strategy to Henan 2026 48 college-major-group logic
+
+- Time: 2026-06-24
+- Request: User asked to upgrade the system algorithm after agreeing with the Henan 2026 strategy direction.
+- Actions:
+  1. Re-read `agent.md` and active process rules before implementation.
+  2. Added failing tests first for:
+     - Henan 2026 rank percentage bands
+     - 48 college-major-group target allocation
+     - same college-major-group de-duplication
+     - avoiding overfilled rush bucket when the candidate pool is small
+     - large historical rank volatility / "大小年" risk detection
+  3. Added `backend/admissions_strategy.py` as the central strategy module for:
+     - total target `48`
+     - bucket targets `rush=14`, `steady=24`, `safe=10`
+     - displayed strategy ratios `29/50/21`
+     - Henan 2026 strategy note
+  4. Updated `backend/admissions_scoring.py` to use rank-percentage bands based on the student's rank:
+     - rush: target rank about 5%-10% better than the student
+     - steady: near-match band
+     - safe: target rank 10%+ lower than the student
+  5. Updated `backend/admissions_presenter.py` so final recommendation selection:
+     - defaults to the 48-group targets
+     - de-duplicates by institution + plan group when a plan group exists
+     - preserves native bucket candidates before using leftover candidates for neighbor-bucket fill
+  6. Updated `backend/admissions_engine.py` to flag >10% historical rank volatility as high "大小年位次波动" risk and to return Henan 2026 strategy metadata.
+  7. Updated report UI copy to present "专业组建议" and show the 48-group target where available.
+  8. Updated stale gap-analysis documentation that still described the old 3/5/3 and paragraph-only export state.
+- Files:
+  - `backend/admissions_strategy.py`
+  - `backend/admissions_scoring.py`
+  - `backend/admissions_presenter.py`
+  - `backend/admissions_engine.py`
+  - `backend/planning_repository.py`
+  - `backend/tests/test_admissions_engine.py`
+  - `src/components/reports/ReportOutlineCard.vue`
+  - `src/components/reports/ReportRecommendationTable.vue`
+  - `docs/志愿报告功能差距分析.md`
+  - `agent.md` (local memory update only)
+- Verification:
+  - RED: `python -m unittest backend.tests.test_admissions_engine -v` failed on 6 expected new-strategy assertions before production changes.
+  - `python -m unittest backend.tests.test_admissions_engine -v`: PASS, 9 tests OK
+  - `python -m py_compile backend\admissions_strategy.py backend\admissions_scoring.py backend\admissions_presenter.py backend\admissions_engine.py backend\planning_repository.py`: PASS
+  - `git diff --check -- backend/admissions_strategy.py backend/admissions_scoring.py backend/admissions_presenter.py backend/admissions_engine.py backend/planning_repository.py backend/tests/test_admissions_engine.py src/components/reports/ReportOutlineCard.vue src/components/reports/ReportRecommendationTable.vue docs/志愿报告功能差距分析.md agent.md`: PASS, only Git line-ending warnings
+  - `python -m unittest discover -s backend/tests`: PASS, 89 tests OK
+  - `npm run test:product-flow`: PASS
+  - `npm run build`: PASS
+- Result:
+  - The admissions recommendation core now follows Henan 2026 ordinary undergraduate 48 college-major-group strategy instead of the old 3/5/3 display target.
+  - The system now treats college-major-group as the final selection unit when group codes are present, keeps the recommendation table compatible, and exposes the 48-group target in report-facing strategy metadata.
+
+### Task 48: Review external 2026 Henan volunteer-application guide CSV
+
+- Time: 2026-06-24
+- Request: User provided `D:/desktop/副本01、河南-2026高考志愿填报专家版【专业组48+专业6】.csv` and asked to review the filling guide.
+- Actions:
+  1. Re-read `agent.md` and `C:\Users\lenovo\.codex\RTK.md` before file operations.
+  2. Used the spreadsheet workflow for CSV inspection, but treated the file as read-only.
+  3. Confirmed the file is `utf-8-sig`, about 4 KB, and is plain-text guide content rather than a structured CSV table.
+  4. Read the full guide content covering six steps: rank lookup, range filtering, benchmark school, risk/冲/稳/保/垫/兜 allocation, ordering, and final safety checks.
+  5. Cross-checked the guide's assumptions against current Henan 2026 ordinary undergraduate policy signals: 48 college-major-group choices, each with 6 majors and an adjustment option.
+- Result:
+  - The guide is useful as an advisory workflow and can inform product copy and strategy modes.
+  - It should not be imported as admissions-plan data, and several statements require correction before being used in the system: "100%不滑档、不退档" is unsafe, score-difference bands should be converted to rank/equivalent-rank bands, and the listed percentages do not exactly match the 48-choice counts.
+
+### Task 49: Propose next improvement direction after reviewing six-step guide
+
+- Time: 2026-06-24
+- Request: User asked how the system should be improved now after reviewing the external 2026 Henan filling guide.
+- Actions:
+  1. Re-read recent `agent.md` context and `C:\Users\lenovo\.codex\RTK.md`.
+  2. Reviewed the active admissions strategy files at a high level, including `backend/admissions_strategy.py`, `backend/admissions_scoring.py`, `backend/admissions_presenter.py`, and `backend/admissions_engine.py`.
+  3. Confirmed the current working tree already contains the previous Henan 2026 48-college-major-group strategy upgrade and should be refined rather than replaced.
+- Result:
+  - Recommended the next improvement as a second-stage strategy refinement: preserve the current 48-group base, add optional risk profiles, split display labels into 险/冲/稳/保/垫/兜, add professional-group internal safety checks, and make reports explain why a recommendation sits in each layer.
+
+### Task 50: Implement six-tier display and admissions strategy modes
+
+- Time: 2026-06-24
+- Request: User approved implementing "六档展示 + 策略模式" after reviewing the external filling guide.
+- Actions:
+  1. Re-read `agent.md` and active engineering/TDD workflow instructions before editing.
+  2. Added failing tests first for:
+     - resolving the conservative strategy profile
+     - splitting 48 recommendations into 险5 / 冲5 / 稳16 / 保12 / 垫5 / 兜5
+     - returning six plan columns when conservative mode is requested
+     - grouping PDF/Word export blocks by six display tiers
+  3. Expanded `backend/admissions_strategy.py` into a centralized strategy profile module:
+     - `balanced`: default 14 / 24 / 10 冲稳保 profile
+     - `conservative`: 10 / 16 / 22 coarse buckets with six-tier display
+     - `aggressive`: optional more冲刺-oriented profile for future use
+  4. Updated admissions context so `student.strategy_type` can resolve into an admissions strategy mode.
+  5. Updated `backend/admissions_presenter.py` so recommendations keep their original coarse bucket while adding display-tier fields such as `displayTier`, `displayTierLabel`, and `displayTierTitle`.
+  6. Updated `backend/admissions_engine.py` so strategy metadata includes `mode`, `name`, `display_tiers`, `display_tier_counts`, and a mode-specific strategy note.
+  7. Updated `backend/report_exporters.py` so exports group by six display tiers when present and retain the old three-bucket grouping for legacy data.
+  8. Updated report frontend display:
+     - `src/pages/ReportsPage.vue` now derives bucket definitions from backend `display_tiers`.
+     - `src/components/reports/ReportOutlineCard.vue` now shows six-tier counts for conservative mode.
+- Files:
+  - `backend/admissions_strategy.py`
+  - `backend/admissions_context.py`
+  - `backend/admissions_presenter.py`
+  - `backend/admissions_engine.py`
+  - `backend/report_exporters.py`
+  - `backend/tests/test_admissions_engine.py`
+  - `backend/tests/test_report_exporter_unit.py`
+  - `src/pages/ReportsPage.vue`
+  - `src/components/reports/ReportOutlineCard.vue`
+  - `agent.md` (local memory update)
+- Verification:
+  - RED: `python -m unittest backend.tests.test_admissions_engine -v` failed as expected before implementation because `resolve_strategy_profile` did not exist.
+  - RED: `python -m unittest backend.tests.test_report_exporter_unit.ReportExporterUnitTest.test_report_blocks_group_recommendations_by_six_display_tiers -v` failed as expected because export still grouped by three coarse buckets.
+  - `python -m unittest backend.tests.test_admissions_engine -v`: PASS, 12 tests OK
+  - `python -m unittest backend.tests.test_report_exporter_unit.ReportExporterUnitTest.test_report_blocks_group_recommendations_by_six_display_tiers -v`: PASS
+  - `python -m unittest backend.tests.test_admissions_engine backend.tests.test_report_exporter_unit -v`: PASS, 18 tests OK
+  - `python -m py_compile backend/admissions_strategy.py backend/admissions_presenter.py backend/admissions_engine.py backend/admissions_context.py backend/report_exporters.py`: PASS
+  - `python -m unittest discover -s backend/tests`: PASS, 93 tests OK
+  - `npm run build`: PASS
+  - `npm run test:product-flow`: PASS
+  - `git diff --check -- backend/admissions_strategy.py backend/admissions_presenter.py backend/admissions_engine.py backend/admissions_context.py backend/report_exporters.py backend/tests/test_admissions_engine.py backend/tests/test_report_exporter_unit.py src/pages/ReportsPage.vue src/components/reports/ReportOutlineCard.vue`: PASS
+- Result:
+  - The system now supports strategy modes while preserving the existing balanced default.
+  - Conservative mode can produce and display the full 48 college-major-group plan as 险5 / 冲5 / 稳16 / 保12 / 垫5 / 兜5, and the report/export paths can surface those six tiers.
+
+### Task 50: Create concise system explanation document for promotion teacher
+
+- Time: 2026-06-24
+- Request: User asked for a concise and clear document to explain the system to a teacher who wants to understand how it can be promoted.
+- Actions:
+  1. Re-read `agent.md` before file operations.
+  2. Reviewed existing `README.md`, `docs/README.md`, and `docs/推广老师沟通说明_2026-06-24.md`.
+  3. Created a shorter promotion-facing document focused on quick explanation rather than full project detail.
+  4. Added the concise document to `docs/README.md` recommended reading order.
+  5. Added the concise document link to the README promotion-teacher section.
+- Files:
+  - `docs/系统宣传讲解简版_2026-06-24.md` (new)
+  - `docs/README.md`
+  - `README.md`
+  - `agent.md`
+- Result:
+  - The project now has a 3-5 minute teacher-facing explanation document covering positioning, user pain points, current demoable functions, demo route, promotion wording, forbidden claims, product packaging, and a short talk script.
+
+### Task 51: Define family-facing report experience redesign
+
+- Time: 2026-06-24
+- Request: User said the main system value is in report management but the current effect is not good enough; then clarified the target experience is for students and high-cognition parents rather than teachers or internal staff.
+- Actions:
+  1. Re-read `agent.md` before work and followed Product Design / brainstorming gates before implementation.
+  2. Confirmed the design brief with the user: transform the report page from a backend-like management page into a final family-facing report and decision experience.
+  3. Created `docs/superpowers/specs/2026-06-24-family-facing-report-experience-design.md`.
+  4. The spec defines:
+     - target audience and non-goals
+     - current product hierarchy problem
+     - report cover summary
+     - core conclusion
+     - formal 48 college-major-group plan
+     - evidence and risk explanation
+     - human review checklist
+     - delivery/advisor area demotion
+     - frontend/backend impact and phased implementation
+  5. Self-reviewed the spec for placeholder terms and Markdown formatting issues.
+- Files:
+  - `docs/superpowers/specs/2026-06-24-family-facing-report-experience-design.md`
+  - `agent.md`
+- Verification:
+  - `rg "TBD|TODO|implement later|待定" docs/superpowers/specs/2026-06-24-family-facing-report-experience-design.md`: PASS, no matches
+  - `git diff --check -- docs/superpowers/specs/2026-06-24-family-facing-report-experience-design.md`: PASS
+- Result:
+  - The family-facing report redesign direction is now captured as a durable design spec.
+  - No UI implementation has started yet; next step is to write an implementation plan or, if desired, produce visual alternatives before coding.
+
+### Task 52: Prepare three report-page visual directions before coding
+
+- Time: 2026-06-24
+- Request: User asked to produce three report page visual directions before coding.
+- Actions:
+  1. Re-read `agent.md` and Product Design ideation instructions.
+  2. Loaded the family-facing report redesign spec as the design brief.
+  3. Checked Product Design user context; no saved context exists.
+  4. Checked image-generation availability. The current thread has no built-in `image_gen` tool exposed, and `IMAGEGEN2_API_KEY` is not configured, so live bitmap mockup generation is unavailable in this session.
+  5. Prepared three text-based visual direction boards instead, each suitable as a coding target once the user selects one.
+- Result:
+  - No UI implementation has started.
+  - The next decision is for the user to choose one of the three visual directions, or provide image-generation credentials if actual bitmap mockups are required before selection.
+
+### Task 53: Lock report visual direction and write implementation plan
+
+- Time: 2026-06-24
+- Request: User selected the visual direction: use "正式报告书" as the main direction, absorb "决策驾驶舱" risk/evidence metrics, and do not use the narrative-heavy third option as the main page.
+- Actions:
+  1. Re-read `agent.md`, `C:\Users\lenovo\.codex\RTK.md`, the writing-plans skill, and the family-facing report design spec.
+  2. Reviewed the current report-page files and package scripts:
+     - `src/pages/ReportsPage.vue`
+     - `src/components/reports/ReportResultSourceBanner.vue`
+     - `src/components/reports/ReportTraceabilityPanel.vue`
+     - `package.json`
+  3. Created implementation plan `docs/superpowers/plans/2026-06-24-family-facing-report-implementation-plan.md`.
+  4. The plan splits implementation into:
+     - additive backend family summary contract
+     - report hero summary
+     - core conclusion section
+     - formal 48-group plan table reframe
+     - evidence metrics panel
+     - manual review checklist and lower-priority operations area
+     - product-flow smoke updates
+     - final backend/frontend verification
+  5. Self-reviewed the plan for placeholders and formatting.
+- Files:
+  - `docs/superpowers/plans/2026-06-24-family-facing-report-implementation-plan.md`
+  - `agent.md`
+- Verification:
+  - `rg "TBD|TODO|implement later|fill in details|待定" docs/superpowers/plans/2026-06-24-family-facing-report-implementation-plan.md`: PASS, no matches
+  - `git diff --check -- docs/superpowers/plans/2026-06-24-family-facing-report-implementation-plan.md`: PASS
+- Result:
+  - The visual direction is locked and an implementation plan is ready.
+  - No UI implementation has started yet.
+
+### Task 54: Implement family-facing report first slice
+
+- Time: 2026-06-24
+- Request: User confirmed continuing with visual direction 1, the formal report-book style, while absorbing risk/evidence indicators from direction 2. Execute step by step.
+- Actions:
+  1. Re-read `agent.md`, `C:\Users\lenovo\.codex\RTK.md`, and the report implementation plan before editing.
+  2. Followed the TDD flow for the backend family-facing summary contract.
+  3. Added `finalConclusion` and `reviewChecklist` to the real report rule summary in an additive, backward-compatible way.
+  4. Created `src/components/reports/ReportHeroSummary.vue` for the report-book first screen with conclusion, strategy, data-source facts, and export actions.
+  5. Created `src/components/reports/ReportCoreConclusion.vue` for the first-choice recommendation, strategy explanation, and top risk notes.
+  6. Wired both components into `src/pages/ReportsPage.vue` without removing existing report management, export, or traceability features.
+- Files:
+  - `backend/planning_repository.py`
+  - `backend/tests/test_planning_repository_structured_report.py`
+  - `src/pages/ReportsPage.vue`
+  - `src/components/reports/ReportHeroSummary.vue`
+  - `src/components/reports/ReportCoreConclusion.vue`
+  - `agent.md`
+- Verification:
+  - RED: `rtk python -m unittest backend.tests.test_planning_repository_structured_report -v` failed before implementation because `finalConclusion` was missing.
+  - GREEN: `rtk python -m unittest backend.tests.test_planning_repository_structured_report -v`: PASS, 3 tests OK.
+  - `rtk npm run build`: PASS after adding the report hero.
+  - `rtk npm run build`: PASS after adding the core conclusion.
+  - `rtk git diff --check -- backend/planning_repository.py backend/tests/test_planning_repository_structured_report.py src/pages/ReportsPage.vue src/components/reports/ReportHeroSummary.vue src/components/reports/ReportCoreConclusion.vue`: PASS.
+- Result:
+  - The report page now starts moving from a management page toward a family-facing formal report: first screen summary, final conclusion text, data-source confidence, export actions, and a core conclusion section are in place.
+  - Next recommended slice: reframe the 48 college-major-group table as the formal plan section, then add the evidence metrics panel and manual review checklist.
+
+### Task 55: Reframe recommendation table as formal 48-group plan
+
+- Time: 2026-06-24
+- Request: Continue the family-facing report redesign with the next implementation slice.
+- Actions:
+  1. Re-read `agent.md`, `C:\Users\lenovo\.codex\RTK.md`, and the family-facing report implementation plan before editing.
+  2. Added product-flow smoke assertions for the formal recommendation table source so the old "正式院校专业推荐表" framing would fail.
+  3. Updated `src/components/reports/ReportRecommendationTable.vue` to present the section as "48 个院校专业组正式方案".
+  4. Added six-tier row display using `displayTierLabel` / bucket fallback, and marked the matching first-choice row with a "第一志愿" tag.
+  5. Tightened the table surface styling toward a calmer formal-report look with white/ink surfaces and 8px radii.
+- Files:
+  - `scripts/check_product_flow.cjs`
+  - `src/components/reports/ReportRecommendationTable.vue`
+  - `agent.md`
+- Verification:
+  - RED: `rtk npm run test:product-flow` failed before implementation because the new "48 个院校专业组正式方案" assertion was missing.
+  - GREEN: `rtk npm run test:product-flow`: PASS.
+  - `rtk npm run build`: PASS.
+  - `rtk git diff --check -- scripts/check_product_flow.cjs src/components/reports/ReportRecommendationTable.vue`: PASS.
+- Result:
+  - The recommendation table now reads as the formal 48 college-major-group plan section rather than a backend recommendation table.
+  - Next recommended slice: add the evidence metrics panel below the formal plan table.
+
+### Task 56: Add evidence metrics panel to family-facing report
+
+- Time: 2026-06-24
+- Request: User asked to continue with the evidence metrics panel after the formal 48-group plan table slice.
+- Actions:
+  1. Re-read `agent.md`, `C:\Users\lenovo\.codex\RTK.md`, relevant workflow skills, and the family-facing report implementation plan before editing.
+  2. Added product-flow smoke assertions for a new `ReportEvidencePanel.vue` component and report-page wiring.
+  3. Created `src/components/reports/ReportEvidencePanel.vue` as a formal report evidence section answering:
+     - data source
+     - recommendation sample size
+     - top manual-review risk
+  4. Wired the evidence panel below `ReportRecommendationTable` in `src/pages/ReportsPage.vue`.
+  5. Kept the component read-only and frontend-only; no backend contract or API changes were added.
+- Files:
+  - `scripts/check_product_flow.cjs`
+  - `src/pages/ReportsPage.vue`
+  - `src/components/reports/ReportEvidencePanel.vue`
+  - `agent.md`
+- Verification:
+  - RED: `rtk npm run test:product-flow` failed before implementation because `ReportEvidencePanel.vue` did not exist.
+  - GREEN: `rtk npm run test:product-flow`: PASS.
+  - `rtk npm run build`: PASS.
+  - `rtk git diff --check -- scripts/check_product_flow.cjs src/pages/ReportsPage.vue src/components/reports/ReportEvidencePanel.vue`: PASS.
+- Result:
+  - The report page now includes a compact evidence/risk metrics section under the formal 48 college-major-group plan.
+  - Next recommended slice: add the manual review checklist and visually demote the traceability/advisor operations area.
+
+### Task 57: Assess family-facing report UI trust design
+
+- Time: 2026-06-24
+- Request: User invoked the frontend-design skill and asked, from the user perspective, how the report interface should be designed so students and high-cognition parents feel the system is highly reliable.
+- Actions:
+  1. Re-read `agent.md`, `C:\Users\lenovo\.codex\RTK.md`, `using-superpowers`, and `frontend-design`.
+  2. Reviewed the recent report redesign context from project memory: formal report-book direction, six-tier strategy display, formal 48-group plan section, and evidence metrics panel.
+  3. Prepared a user-trust-oriented design recommendation without modifying production UI code in this turn.
+- Result:
+  - Recommended shifting the page from "component stack" to a "consultant-issued formal report" experience: stronger document hierarchy, visible evidence chain, restrained professional palette, clear decision summary, and lower-priority operational controls.
+
+### Task 58: Code trust-oriented formal report UI polish
+
+- Time: 2026-06-24
+- Request: User said "开始编码" after confirming the report page should feel more professional and reliable for students and high-cognition parents.
+- Actions:
+  1. Re-read `agent.md`, `C:\Users\lenovo\.codex\RTK.md`, frontend design, engineering discipline, TDD, verification, and the family-facing report implementation plan before editing.
+  2. Added RED product-flow smoke assertions for trust cues: formal Henan 2026 report cover, real admissions data, 48 professional-group plan, evidence-chain review, and manual review checklist.
+  3. Upgraded `ReportHeroSummary.vue` into a stronger formal report-book cover with "河南 2026 高考志愿正式规划报告", a generated seal, and three trust badges.
+  4. Upgraded `ReportEvidencePanel.vue` from compact metrics to a "证据链审阅" panel that explains data source, sample size, and top review risk.
+  5. Added `ReportReviewChecklist.vue` and wired it into `ReportsPage.vue` after the evidence panel.
+  6. Visually demoted `ReportTraceabilityPanel.vue` into a lower-priority operations area and tightened report-page card styling to 8px radius, white/ink surfaces, and restrained teal/copper accents.
+  7. Started a Vite dev server on `http://127.0.0.1:5174/` because port 5173 was already occupied; captured Playwright screenshots for `/reports?studentId=12`.
+- Files:
+  - `scripts/check_product_flow.cjs`
+  - `src/pages/ReportsPage.vue`
+  - `src/components/reports/ReportHeroSummary.vue`
+  - `src/components/reports/ReportEvidencePanel.vue`
+  - `src/components/reports/ReportReviewChecklist.vue`
+  - `src/components/reports/ReportTraceabilityPanel.vue`
+  - `output/playwright/reports-page-trust-student-12-loaded.png`
+  - `output/playwright/reports-page-trust-student-12-full.png`
+  - `agent.md`
+- Verification:
+  - RED: `rtk npm run test:product-flow` failed first because `ReportReviewChecklist.vue` did not exist.
+  - GREEN: `rtk npm run test:product-flow`: PASS.
+  - `rtk npm run build`: PASS.
+  - `rtk git diff --check -- scripts/check_product_flow.cjs src/pages/ReportsPage.vue src/components/reports/ReportHeroSummary.vue src/components/reports/ReportEvidencePanel.vue src/components/reports/ReportReviewChecklist.vue src/components/reports/ReportTraceabilityPanel.vue`: PASS.
+  - Playwright screenshot with `--wait-for-selector=.report-hero-summary` confirmed the formal report hero renders at `http://127.0.0.1:5174/reports?studentId=12`.
+  - Playwright full-page screenshot with `--wait-for-selector=.report-review-checklist` confirmed the manual review checklist renders.
+- Result:
+  - The report page now presents stronger family-facing trust signals: formal report cover, visible evidence badges, evidence-chain explanation, manual review checklist, and lower-priority advisor/export traceability.
+  - The first screen now reads more like a professional report deliverable than a backend management page.
+
+### Task 59: Fix lower report layout and PDF viewing flow
+
+- Time: 2026-06-24
+- Request: User said the upper report section style is acceptable, but the lower half still looks poor, requires horizontal dragging to see the right side, and exported PDF cannot be viewed conveniently.
+- Actions:
+  1. Re-read `agent.md`, `C:\Users\lenovo\.codex\RTK.md`, frontend design, engineering discipline, systematic debugging, TDD, and verification instructions.
+  2. Added product-flow smoke assertions that the formal recommendation section must use `recommendation-card-list`, must not use `el-table` / `el-table-column`, the lower paper preview must use `paper-recommendation-list`, must not use `paper-table-wrapper`, and PDF downloads must pass `previewInNewTab`.
+  3. Verified the smoke test failed first because the old `el-table` structure still existed.
+  4. Replaced `ReportRecommendationTable.vue` bucket tables with responsive recommendation cards, keeping six-tier labels, first-choice tags, score/rank metrics, risk labels, and recommendation reasons.
+  5. Replaced the lower `paper-sheet` recommendation table in `ReportsPage.vue` with a responsive card list so it no longer needs horizontal scrolling.
+  6. Updated `src/api/client.js`, `src/api/planning.js`, and `ReportsPage.vue` so PDF delivery downloads still save the file but also open a Blob URL preview tab for immediate viewing.
+  7. Reproduced the PDF export chain through the backend API and saved `output/playwright/pdf-export-verify.pdf`; verified the response is `application/pdf`, starts with `%PDF-1.4`, contains Catalog/Pages, ends with EOF, and is about 82 KB.
+  8. Captured `output/playwright/reports-page-no-horizontal-table.png` after waiting for `.recommendation-card-list` to render.
+- Files:
+  - `scripts/check_product_flow.cjs`
+  - `src/api/client.js`
+  - `src/api/planning.js`
+  - `src/pages/ReportsPage.vue`
+  - `src/components/reports/ReportRecommendationTable.vue`
+  - `output/playwright/pdf-export-verify.pdf`
+  - `output/playwright/reports-page-no-horizontal-table.png`
+  - `agent.md`
+- Verification:
+  - RED: `rtk npm run test:product-flow` failed first because `recommendation-card-list` was missing and the old `el-table` structure still existed.
+  - GREEN: `rtk npm run test:product-flow`: PASS.
+  - `rtk npm run build`: PASS.
+  - `rtk git diff --check -- scripts/check_product_flow.cjs src/api/client.js src/api/planning.js src/pages/ReportsPage.vue src/components/reports/ReportRecommendationTable.vue`: PASS.
+  - Backend PDF API manual check: export endpoint returned a delivery record, download endpoint returned `application/pdf`, and the saved file has a valid PDF header/catalog/pages/EOF.
+- Result:
+  - The formal plan and lower paper preview no longer rely on wide horizontal tables; they now render as responsive cards.
+  - PDF export now keeps download behavior and also opens a preview tab for immediate viewing.
+
+### Task 60: Improve formal PDF report structure and personalization
+
+- Time: 2026-06-24
+- Request: User asked why exported PDF looks unlike the document/report page and why content does not feel personalized enough.
+- Actions:
+  1. Re-read `agent.md` and `C:\Users\lenovo\.codex\RTK.md`, then inspected the report export pipeline.
+  2. Identified the root cause: the web report had been redesigned as a formal report-book experience, but PDF/DOCX exports still used the older generic block/table exporter.
+  3. Added report exporter tests requiring a formal cover title, personal decision profile, core conclusion, student-fit explanation, evidence chain, and review checklist before the recommendation tables.
+  4. Updated `backend/report_exporters.py` so exported reports now start with `河南 2026 高考志愿正式规划报告`, include student snapshot fields, final conclusion, matched evidence, risk notes, and manual review checklist.
+  5. Added top-level student score/rank data into `reportJson.studentSnapshot` from `backend/planning_repository.py` so export content can be student-specific.
+  6. Added PDF page-break handling before the formal plan section for both PDF and DOCX, prevented orphan table headers at page bottom, and increased table-to-text spacing.
+  7. Generated `output/pdf/formal-report-sample.pdf` and rendered page PNGs for visual verification.
+- Files:
+  - `backend/report_exporters.py`
+  - `backend/planning_repository.py`
+  - `backend/tests/test_report_exporter_unit.py`
+  - `backend/tests/report_export_fixtures.py`
+  - `output/pdf/formal-report-sample.pdf`
+  - `output/pdf/formal-report-sample-page1.png`
+  - `output/pdf/formal-report-sample-page2.png`
+  - `agent.md`
+- Verification:
+  - RED: `rtk python -m unittest backend.tests.test_report_exporter_unit.ReportExporterUnitTest.test_report_blocks_start_with_formal_cover_and_personalized_evidence -v` failed before implementation because the first block was still the old student-title report.
+  - RED: `rtk python -m unittest backend.tests.test_report_exporter_unit.ReportExporterUnitTest.test_report_blocks_put_formal_plan_after_page_break -v` failed before page-break support.
+  - RED: `rtk python -m unittest backend.tests.test_report_exporter_unit.ReportExporterUnitTest.test_pdf_table_leaves_readable_gap_before_following_text -v` failed before increasing table spacing.
+  - GREEN: `rtk python -m unittest backend.tests.test_report_exporter_unit backend.tests.test_report_export_integration backend.tests.test_report_delivery_download -v`: 13 tests OK.
+  - GREEN: `rtk python -m unittest discover -s backend/tests`: 98 tests OK.
+  - GREEN: `rtk python -m py_compile backend/report_exporters.py backend/planning_repository.py backend/tests/test_report_exporter_unit.py backend/tests/report_export_fixtures.py`: PASS.
+  - GREEN: `rtk git diff --check -- backend/report_exporters.py backend/planning_repository.py backend/tests/test_report_exporter_unit.py backend/tests/report_export_fixtures.py`: PASS.
+  - Visual check: rendered PDF pages with bundled Poppler; page 1 now contains the formal cover/profile/conclusion/evidence, and page 2 starts the formal recommendation plan without orphan table headers.
+- Result:
+  - PDF/DOCX exports now align much better with the formal report-book direction and include stronger student-specific narrative and evidence.
+  - Remaining future improvement: replace the custom low-level PDF renderer with HTML-to-PDF or ReportLab if the goal is pixel-level parity with the web report page.
+
+### Task 61: Replace default PDF export renderer with ReportLab template
+
+- Time: 2026-06-24
+- Request: User asked to upgrade the PDF renderer from the custom low-level PDF writer to HTML-to-PDF or ReportLab template.
+- Decision:
+  - Chose ReportLab as the default PDF renderer because it keeps PDF generation fully in the backend, avoids browser/runtime coupling, and is easier to deploy reliably than HTML-to-PDF for the current app.
+- Actions:
+  1. Re-read `agent.md`, `C:\Users\lenovo\.codex\RTK.md`, PDF skill instructions, and engineering/TDD/verification guidance.
+  2. Installed `reportlab` into the current venv using `uv pip install "reportlab>=4.2,<5.0"`.
+  3. Added `reportlab>=4.2,<5.0` to `backend/requirements.txt`.
+  4. Added a failing exporter test requiring generated PDFs to expose a ReportLab producer metadata value.
+  5. Replaced `export_report_pdf` default output path with a ReportLab `SimpleDocTemplate` renderer while keeping existing `ReportBlock` content generation and DOCX export unchanged.
+  6. Added ReportLab styles for formal title, meta, headings, body text, bullets, signatures, and structured tables.
+  7. Added Chinese font registration with Windows font candidates and CID fallback.
+  8. Updated report delivery payload metadata from `builtin_pdf_renderer` to `reportlab_pdf_renderer`, with integration test coverage.
+  9. Generated and rendered `output/pdf/reportlab-formal-report-sample.pdf` pages 1-3 for visual QA.
+- Files:
+  - `backend/report_exporters.py`
+  - `backend/report_delivery.py`
+  - `backend/requirements.txt`
+  - `backend/tests/test_report_exporter_unit.py`
+  - `backend/tests/test_report_export_integration.py`
+  - `output/pdf/reportlab-formal-report-sample.pdf`
+  - `output/pdf/reportlab-formal-report-sample-1.png`
+  - `output/pdf/reportlab-formal-report-sample-2.png`
+  - `output/pdf/reportlab-formal-report-sample-page3.png`
+  - `agent.md`
+- Verification:
+  - RED: `rtk python -m unittest backend.tests.test_report_exporter_unit.ReportExporterUnitTest.test_export_report_pdf_generates_real_pdf -v` failed before implementation because the PDF Producer metadata was empty/not ReportLab.
+  - GREEN: `rtk python -m unittest backend.tests.test_report_exporter_unit -v`: 10 tests OK.
+  - RED/GREEN: `rtk python -m unittest backend.tests.test_report_export_integration.ReportExportIntegrationTest.test_export_report_package_minimal_regression_for_pdf_and_word -v` first failed because the PDF renderEngine was still `builtin_pdf_renderer`, then passed after updating it to `reportlab_pdf_renderer`.
+  - GREEN: `rtk python -m unittest backend.tests.test_report_exporter_unit backend.tests.test_report_export_integration backend.tests.test_report_delivery_download -v`: 13 tests OK.
+  - GREEN: `rtk python -m unittest discover -s backend/tests`: 98 tests OK.
+  - GREEN: `rtk python -m py_compile backend/report_exporters.py backend/report_delivery.py backend/tests/test_report_exporter_unit.py backend/tests/test_report_export_integration.py`: PASS.
+  - GREEN: `rtk git diff --check -- backend/report_exporters.py backend/report_delivery.py backend/requirements.txt backend/tests/test_report_exporter_unit.py backend/tests/test_report_export_integration.py`: PASS.
+  - Visual QA: rendered pages 1-3 with bundled Poppler. New ReportLab PDF has embedded Chinese fonts, clean formal headings, stable tables, and page footer numbering.
+- Result:
+  - PDF export is now ReportLab-template based by default.
+  - The previous low-level PDF helper functions remain in the module for internal compatibility and existing targeted pagination tests, but the production export path no longer uses them.
+
+### Task 62: Commit and push report upgrade work to cloud
+
+- Time: 2026-06-24
+- Request: User asked to submit the current work to the cloud remote.
+- Actions:
+  1. Re-read `agent.md` and `C:\Users\lenovo\.codex\RTK.md` before operating on Git state.
+  2. Checked the configured remote, working tree, diff summary, `.gitignore`, and untracked local artifacts.
+  3. Re-ran the project verification gates before committing.
+  4. Planned to commit the source, tests, docs, requirements, and this memory update while leaving generated screenshots, sample PDFs, `output/`, `.claude/`, and temporary backend logs untracked.
+- Files:
+  - `agent.md`
+  - Report UI/backend/export source files and tests staged in the Git commit.
+- Verification:
+  - `rtk python -m unittest discover -s backend/tests`: PASS, 98 tests OK.
+  - `rtk npm run build`: PASS.
+  - `rtk npm run test:product-flow`: PASS.
+  - `rtk git diff --check`: PASS.
+- Result:
+  - Ready to create a Git commit and push `main` to `origin`.

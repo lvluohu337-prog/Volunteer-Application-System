@@ -9,14 +9,11 @@ from backend.admissions_scoring import (
     RISK_LEVEL_LABELS,
     _bucket_gap,
 )
+from backend.admissions_strategy import HENAN_2026_RECOMMENDATION_TARGETS, resolve_strategy_profile
 from backend.rules_engine import safe_int, safe_number
 
 
-RECOMMENDATION_TARGETS = {
-    "rush": 3,
-    "steady": 5,
-    "safe": 3,
-}
+RECOMMENDATION_TARGETS = HENAN_2026_RECOMMENDATION_TARGETS
 
 def _candidate_sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
     probability_score = safe_int((item.get("probability") or {}).get("score"))
@@ -36,16 +33,28 @@ def _candidate_sort_key(item: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def _candidate_family_key(item: dict[str, Any]) -> tuple[int, int]:
-    return (
-        safe_int(item.get("institution_id")),
-        safe_int(item.get("major_id")),
+def _candidate_family_key(item: dict[str, Any]) -> tuple[str, str]:
+    institution_key = str(
+        safe_int(item.get("institution_id"))
+        or item.get("institution_code")
+        or item.get("institution_name")
+        or ""
     )
+    group_key = str(item.get("plan_group_code") or item.get("plan_group_name") or "").strip()
+    if group_key:
+        return (institution_key, f"group:{group_key}")
+    major_key = str(
+        safe_int(item.get("major_id"))
+        or item.get("major_code")
+        or item.get("major_name")
+        or ""
+    )
+    return (institution_key, f"major:{major_key}")
 
 
 def _dedupe_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
     deduped: list[dict[str, Any]] = []
-    seen_family_keys: set[tuple[int, int]] = set()
+    seen_family_keys: set[tuple[str, str]] = set()
     for item in sorted(candidates, key=_candidate_sort_key, reverse=True):
         family_key = _candidate_family_key(item)
         if family_key in seen_family_keys:
@@ -60,6 +69,16 @@ def _assign_bucket(item: dict[str, Any], display_bucket: str) -> dict[str, Any]:
     assigned["display_bucket"] = display_bucket
     assigned["source_bucket"] = item.get("bucket")
     assigned["bucket_adjusted"] = display_bucket != item.get("bucket")
+    return assigned
+
+
+def _assign_display_tier(item: dict[str, Any], tier: dict[str, Any]) -> dict[str, Any]:
+    assigned = dict(item)
+    assigned["display_tier"] = tier["key"]
+    assigned["display_tier_label"] = tier["label"]
+    assigned["display_tier_title"] = tier["title"]
+    assigned["display_tier_description"] = tier["description"]
+    assigned["display_tier_variant"] = tier["variant"]
     return assigned
 
 
@@ -94,6 +113,22 @@ def _select_bucketed_recommendations(
                 break
 
     return selected
+
+
+def _select_tiered_recommendations(
+    bucketed_candidates: dict[str, list[dict[str, Any]]],
+    profile: dict[str, Any],
+) -> dict[str, list[dict[str, Any]]]:
+    remaining = {bucket: list(items) for bucket, items in bucketed_candidates.items()}
+    tiered: dict[str, list[dict[str, Any]]] = {}
+    for tier in profile["tiers"]:
+        bucket = str(tier["bucket"])
+        target = safe_int(tier.get("target"))
+        tiered[tier["key"]] = [
+            _assign_display_tier(remaining[bucket].pop(0), tier)
+            for _ in range(min(target, len(remaining.get(bucket, []))))
+        ]
+    return tiered
 
 
 def _candidate_reason(item: dict[str, Any]) -> str:
@@ -142,6 +177,10 @@ def _recommendation_item(item: dict[str, Any], context: dict[str, Any]) -> dict[
         "bucketLabel": BUCKET_META[display_bucket]["title"],
         "sourceBucket": item.get("source_bucket") or item.get("bucket") or display_bucket,
         "bucketAdjusted": bool(item.get("bucket_adjusted")),
+        "displayTier": item.get("display_tier") or display_bucket,
+        "displayTierLabel": item.get("display_tier_label") or BUCKET_META[display_bucket]["title"][:1],
+        "displayTierTitle": item.get("display_tier_title") or BUCKET_META[display_bucket]["title"],
+        "displayTierDescription": item.get("display_tier_description") or "",
         "institutionId": safe_int(item.get("institution_id")) or None,
         "institutionName": item.get("institution_name") or "目标院校",
         "institutionCode": item.get("institution_code") or "",
@@ -276,18 +315,22 @@ def _prepare_recommendation_outputs(
     candidates: list[dict[str, Any]],
     context: dict[str, Any],
 ) -> dict[str, Any]:
+    profile = resolve_strategy_profile(context.get("admissions_strategy_mode") or context.get("strategy_type"))
     deduped_candidates = _dedupe_candidates(candidates)
-    bucketed_candidates = _select_bucketed_recommendations(deduped_candidates)
+    bucketed_candidates = _select_bucketed_recommendations(deduped_candidates, profile["bucket_targets"])
+    tiered_candidates = _select_tiered_recommendations(bucketed_candidates, profile)
     recommendation_table = [
         _recommendation_item(item, context)
-        for bucket in BUCKET_ORDER
-        for item in bucketed_candidates[bucket]
+        for tier in profile["tiers"]
+        for item in tiered_candidates[tier["key"]]
     ]
     first_choice = _select_first_choice(recommendation_table)
     alternatives = _select_alternatives(recommendation_table, first_choice)
     return {
         "candidates": deduped_candidates,
         "bucketed_candidates": bucketed_candidates,
+        "tiered_candidates": tiered_candidates,
+        "strategy_profile": profile,
         "recommendation_table": recommendation_table,
         "first_choice": first_choice,
         "alternatives": alternatives,

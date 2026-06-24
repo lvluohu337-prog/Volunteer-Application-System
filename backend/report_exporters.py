@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 import io
 from pathlib import Path
+import re
 import zipfile
 import zlib
 from xml.sax.saxutils import escape
@@ -69,8 +70,179 @@ def export_report_pdf(
     include_signature: bool = False,
 ) -> None:
     blocks = _build_report_blocks(report_data, reviewed_by=reviewed_by, include_signature=include_signature)
-    page_streams = _build_pdf_page_streams(blocks)
-    output_path.write_bytes(_build_pdf_bytes(page_streams))
+    _export_report_pdf_reportlab(blocks, report_data, output_path)
+
+
+def _nested_dict(source: dict[str, object], *keys: str) -> dict[str, object]:
+    current: object = source
+    for key in keys:
+        if not isinstance(current, dict):
+            return {}
+        current = current.get(key)
+    return current if isinstance(current, dict) else {}
+
+
+def _student_snapshot(report_data: dict[str, object]) -> dict[str, object]:
+    snapshot = report_data.get("studentSnapshot")
+    if isinstance(snapshot, dict):
+        return snapshot
+    return _nested_dict(report_data, "reportJson", "studentSnapshot")
+
+
+def _snapshot_value(snapshot: dict[str, object], *keys: str) -> str:
+    for key in keys:
+        value = snapshot.get(key)
+        if value not in (None, ""):
+            return str(value).strip()
+    return ""
+
+
+def _extract_year(text: str) -> str:
+    match = re.search(r"(20\d{2})", text)
+    return match.group(1) if match else ""
+
+
+def _extract_student_name(report_data: dict[str, object], snapshot: dict[str, object]) -> str:
+    name = _snapshot_value(snapshot, "name")
+    if name:
+        return name
+    title = str(report_data.get("reportTitle") or "").strip()
+    for suffix in ("志愿规划报告预览", "志愿规划报告"):
+        if title.endswith(suffix):
+            return title[: -len(suffix)].strip()
+    return "该学生"
+
+
+def _build_formal_report_title(report_data: dict[str, object], snapshot: dict[str, object]) -> str:
+    subtitle = str(report_data.get("reportSubtitle") or "")
+    province = _snapshot_value(snapshot, "province") or (subtitle.split("/")[0].strip() if subtitle else "")
+    year = _snapshot_value(snapshot, "examYear", "exam_year") or _extract_year(subtitle)
+    if province and year:
+        return f"{province} {year} 高考志愿正式规划报告"
+    return str(report_data.get("reportTitle") or "高考志愿正式规划报告").replace("预览", "正式版")
+
+
+def _build_profile_line(report_data: dict[str, object], snapshot: dict[str, object]) -> str:
+    name = _extract_student_name(report_data, snapshot)
+    province = _snapshot_value(snapshot, "province") or "待补充省份"
+    year = _snapshot_value(snapshot, "examYear", "exam_year") or _extract_year(str(report_data.get("reportSubtitle") or "")) or "待补充年份"
+    subject_group = _snapshot_value(snapshot, "subjectGroup", "subject_group") or "待补充方向"
+    score = _snapshot_value(snapshot, "totalScore", "total_score", "finalScore", "final_score")
+    rank = _snapshot_value(snapshot, "rank", "finalRank", "final_rank")
+
+    parts = [f"{name}：{province} / {year} 届 / {subject_group}"]
+    if score:
+        parts.append(f"总分 {score}")
+    if rank:
+        parts.append(f"位次 {rank}")
+    return "；".join(parts) + "。"
+
+
+def _append_personalized_front_matter(
+    blocks: list[ReportBlock],
+    report_data: dict[str, object],
+    snapshot: dict[str, object],
+) -> None:
+    rule_summary = report_data.get("ruleSummary") if isinstance(report_data.get("ruleSummary"), dict) else {}
+    result_source = report_data.get("resultSource") if isinstance(report_data.get("resultSource"), dict) else {}
+    first_choice = report_data.get("firstChoice") if isinstance(report_data.get("firstChoice"), dict) else None
+    portrait = report_data.get("portraitRecommendation") if isinstance(report_data.get("portraitRecommendation"), dict) else {}
+
+    blocks.append(ReportBlock("heading", "个人决策画像摘要"))
+    profile_lines = [_build_profile_line(report_data, snapshot)]
+    score_comment = str(rule_summary.get("scoreComment") or "").strip()
+    if score_comment:
+        profile_lines.append(score_comment)
+    preferred_direction = str(portrait.get("preferredDirection") or "").strip()
+    recommended_directions = portrait.get("recommendedMajorDirections") if isinstance(portrait.get("recommendedMajorDirections"), list) else []
+    direction_text = " / ".join(str(item) for item in recommended_directions[:3] if str(item).strip())
+    if preferred_direction or direction_text:
+        profile_lines.append(f"个性化方向：{preferred_direction or direction_text}。")
+    blocks.append(ReportBlock("body", "\n".join(profile_lines)))
+
+    conclusion = str(rule_summary.get("finalConclusion") or "").strip()
+    if not conclusion and first_choice:
+        conclusion = (
+            f"建议优先关注 {first_choice.get('institutionName') or '目标院校'} - "
+            f"{first_choice.get('majorName') or '目标专业'}，正式填报前继续复核招生章程、组内专业接受度和调剂边界。"
+        )
+    if conclusion:
+        blocks.append(ReportBlock("heading", "本报告核心结论"))
+        blocks.append(ReportBlock("body", conclusion))
+
+    fit_lines = _build_student_fit_lines(first_choice, portrait)
+    if fit_lines:
+        blocks.append(ReportBlock("heading", "为什么适合该学生"))
+        blocks.append(ReportBlock("body", "\n".join(fit_lines)))
+
+    evidence_lines = _build_evidence_review_lines(rule_summary, result_source)
+    if evidence_lines:
+        blocks.append(ReportBlock("heading", "证据链与复核清单"))
+        blocks.append(ReportBlock("body", "\n".join(evidence_lines)))
+
+
+def _build_student_fit_lines(
+    first_choice: dict[str, object] | None,
+    portrait: dict[str, object],
+) -> list[str]:
+    lines: list[str] = []
+    if first_choice:
+        institution = first_choice.get("institutionName") or "目标院校"
+        major = first_choice.get("majorName") or "目标专业"
+        reason = str(first_choice.get("recommendationReason") or "").strip()
+        subject_requirement = str(first_choice.get("subjectRequirement") or "").strip()
+        city_path_note = str(first_choice.get("cityPathNote") or "").strip()
+        lines.append(f"第一志愿样本：{institution} - {major}。")
+        if reason:
+            lines.append(f"匹配理由：{reason}")
+        if subject_requirement:
+            lines.append(f"选科证据：当前专业组要求为 {subject_requirement}。")
+        if city_path_note:
+            lines.append(f"城市与发展路径：{city_path_note}")
+
+    parent_match = portrait.get("parentConcernMatch") if isinstance(portrait.get("parentConcernMatch"), dict) else {}
+    parent_details = str(parent_match.get("details") or "").strip()
+    if parent_details:
+        lines.append(f"家庭关注点匹配：{parent_details}")
+    return lines
+
+
+def _build_evidence_review_lines(
+    rule_summary: dict[str, object],
+    result_source: dict[str, object],
+) -> list[str]:
+    lines: list[str] = []
+    matched_count = result_source.get("matchedCandidateCount") or rule_summary.get("matchedCount")
+    latest_year = result_source.get("latestAdmissionYear") or rule_summary.get("latestAdmissionYear")
+    source_label = str(result_source.get("label") or "招生数据匹配结果")
+    if matched_count not in (None, ""):
+        year_part = f"{latest_year} 年" if latest_year not in (None, "") else "近年"
+        lines.append(f"数据来源：{source_label}，基于 {year_part}真实招生候选 {matched_count} 条。")
+
+    strategy = rule_summary.get("strategy") if isinstance(rule_summary.get("strategy"), dict) else {}
+    strategy_name = str(strategy.get("name") or "").strip()
+    strategy_note = str(strategy.get("note") or "").strip()
+    if strategy_name or strategy_note:
+        lines.append(f"策略证据：{strategy_name or '当前策略'}；{strategy_note or '按冲稳保结构分配院校专业组。'}")
+
+    top_risks = rule_summary.get("topRisks") or rule_summary.get("riskItems") or []
+    if isinstance(top_risks, list):
+        for risk in top_risks[:3]:
+            risk_text = str(risk).strip()
+            if risk_text:
+                lines.append(f"重点风险：{risk_text}")
+
+    checklist = rule_summary.get("reviewChecklist") or []
+    if isinstance(checklist, list) and checklist:
+        lines.append("交付前复核：" + " / ".join(str(item) for item in checklist if str(item).strip()))
+    return lines
+
+
+def _has_structured_recommendations(report_data: dict[str, object]) -> bool:
+    return any(
+        report_data.get(key)
+        for key in ("recommendationTable", "firstChoice", "alternatives", "notRecommended")
+    )
 
 
 def _build_report_blocks(
@@ -79,7 +251,8 @@ def _build_report_blocks(
     reviewed_by: str | None,
     include_signature: bool,
 ) -> list[ReportBlock]:
-    title = str(report_data.get("reportTitle") or "志愿规划报告")
+    snapshot = _student_snapshot(report_data)
+    title = _build_formal_report_title(report_data, snapshot)
     subtitle = str(report_data.get("reportSubtitle") or "")
     product_label = str(report_data.get("activeProductLabel") or "报告版本")
     blocks = [
@@ -91,6 +264,9 @@ def _build_report_blocks(
     if reviewed_by:
         blocks.append(ReportBlock("meta", f"导出人：{reviewed_by}"))
 
+    _append_personalized_front_matter(blocks, report_data, snapshot)
+    if _has_structured_recommendations(report_data):
+        blocks.append(ReportBlock("page_break"))
     _append_structured_recommendation_blocks(blocks, report_data)
 
     for section in report_data.get("sections") or []:
@@ -121,7 +297,7 @@ def _build_report_blocks(
         blocks.append(ReportBlock("heading", "签字确认"))
         blocks.append(ReportBlock("signature", "咨询师签字：________________    家长确认：________________"))
 
-    return [block for block in blocks if block.text.strip() or block.table_rows]
+    return [block for block in blocks if block.style == "page_break" or block.text.strip() or block.table_rows]
 
 
 def _append_structured_recommendation_blocks(
@@ -144,15 +320,28 @@ def _append_structured_recommendation_blocks(
         )
     )
 
-    grouped: dict[str, list[dict[str, object]]] = {"rush": [], "steady": [], "safe": []}
-    for item in recommendation_table:
-        bucket = str(item.get("bucket") or "")
-        if bucket in grouped:
-            grouped[bucket].append(item)
-        else:
-            grouped["steady"].append(item)
+    has_display_tiers = any(item.get("displayTier") and item.get("displayTierTitle") for item in recommendation_table)
+    if has_display_tiers:
+        grouped: dict[str, list[dict[str, object]]] = {}
+        labels: dict[str, str] = {}
+        for item in recommendation_table:
+            tier_key = str(item.get("displayTier") or item.get("bucket") or "steady")
+            if tier_key not in grouped:
+                grouped[tier_key] = []
+                labels[tier_key] = str(item.get("displayTierTitle") or item.get("bucketLabel") or "稳妥推荐")
+            grouped[tier_key].append(item)
+        bucket_groups = [(tier_key, labels[tier_key]) for tier_key in grouped]
+    else:
+        grouped = {"rush": [], "steady": [], "safe": []}
+        for item in recommendation_table:
+            bucket = str(item.get("bucket") or "")
+            if bucket in grouped:
+                grouped[bucket].append(item)
+            else:
+                grouped["steady"].append(item)
+        bucket_groups = [("rush", "冲刺推荐"), ("steady", "稳妥推荐"), ("safe", "保底推荐")]
 
-    for bucket_key, bucket_label in (("rush", "冲刺推荐"), ("steady", "稳妥推荐"), ("safe", "保底推荐")):
+    for bucket_key, bucket_label in bucket_groups:
         items = grouped[bucket_key]
         if not items:
             continue
@@ -540,6 +729,9 @@ def _format_number(value: object) -> str:
 def _build_docx_document_xml(blocks: list[ReportBlock]) -> str:
     elements: list[str] = []
     for block in blocks:
+        if block.style == "page_break":
+            elements.append(_docx_page_break_xml())
+            continue
         if block.table_rows:
             elements.append(_build_docx_table_xml(block))
             continue
@@ -562,6 +754,10 @@ def _build_docx_document_xml(blocks: list[ReportBlock]) -> str:
         "</w:sectPr>"
         "</w:body></w:document>"
     )
+
+
+def _docx_page_break_xml() -> str:
+    return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>'
 
 
 def _build_docx_table_xml(block: ReportBlock) -> str:
@@ -770,6 +966,232 @@ def _build_docx_styles_xml() -> str:
 </w:styles>"""
 
 
+def _export_report_pdf_reportlab(
+    blocks: list[ReportBlock],
+    report_data: dict[str, object],
+    output_path: Path,
+) -> None:
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except ImportError as exc:
+        raise RuntimeError(
+            "ReportLab is required for PDF export. Install backend dependencies with "
+            "`uv pip install -r backend/requirements.txt`."
+        ) from exc
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    font_name = _register_reportlab_font(pdfmetrics, TTFont, UnicodeCIDFont)
+    styles = _build_reportlab_styles(ParagraphStyle, colors, font_name)
+    title = str(blocks[0].text if blocks else report_data.get("reportTitle") or "高考志愿正式规划报告")
+
+    doc = SimpleDocTemplate(
+        str(output_path),
+        pagesize=A4,
+        leftMargin=PDF_MARGIN_LEFT,
+        rightMargin=PDF_MARGIN_RIGHT,
+        topMargin=PDF_MARGIN_TOP,
+        bottomMargin=PDF_MARGIN_BOTTOM,
+        title=title,
+        author="Gaokao Planning System",
+        creator="Gaokao Planning System",
+    )
+    story = _build_reportlab_story(blocks, styles, Paragraph, Spacer, PageBreak, Table, TableStyle, colors)
+
+    def draw_page(canvas, document) -> None:
+        canvas.saveState()
+        canvas.setTitle(title)
+        canvas.setAuthor("Gaokao Planning System")
+        canvas.setCreator("Gaokao Planning System")
+        canvas.setStrokeColor(colors.HexColor("#d7e0ec"))
+        canvas.setLineWidth(0.6)
+        canvas.line(document.leftMargin, 36, A4[0] - document.rightMargin, 36)
+        canvas.setFont(font_name, 8)
+        canvas.setFillColor(colors.HexColor("#64748b"))
+        canvas.drawRightString(A4[0] - document.rightMargin, 24, f"Page {document.page}")
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=draw_page, onLaterPages=draw_page)
+
+
+def _register_reportlab_font(pdfmetrics, TTFont, UnicodeCIDFont) -> str:
+    font_candidates = (
+        ("MicrosoftYaHei", Path("C:/Windows/Fonts/msyh.ttc")),
+        ("SimHei", Path("C:/Windows/Fonts/simhei.ttf")),
+        ("DengXian", Path("C:/Windows/Fonts/Deng.ttf")),
+    )
+    for font_name, font_path in font_candidates:
+        if not font_path.exists():
+            continue
+        try:
+            pdfmetrics.getFont(font_name)
+            return font_name
+        except KeyError:
+            try:
+                pdfmetrics.registerFont(TTFont(font_name, str(font_path)))
+                return font_name
+            except Exception:
+                continue
+
+    fallback_name = "STSong-Light"
+    try:
+        pdfmetrics.getFont(fallback_name)
+    except KeyError:
+        pdfmetrics.registerFont(UnicodeCIDFont(fallback_name))
+    return fallback_name
+
+
+def _build_reportlab_styles(ParagraphStyle, colors, font_name: str) -> dict[str, object]:
+    base = {
+        "fontName": font_name,
+        "alignment": 0,
+        "wordWrap": "CJK",
+    }
+    return {
+        "title": ParagraphStyle(
+            "ReportTitle",
+            **base,
+            fontSize=22,
+            leading=31,
+            textColor=colors.HexColor("#123A8F"),
+            spaceAfter=22,
+        ),
+        "meta": ParagraphStyle(
+            "ReportMeta",
+            **base,
+            fontSize=9.5,
+            leading=15,
+            textColor=colors.HexColor("#64748b"),
+            spaceAfter=2,
+        ),
+        "heading": ParagraphStyle(
+            "ReportHeading",
+            **base,
+            fontSize=14,
+            leading=22,
+            textColor=colors.HexColor("#0f766e"),
+            spaceBefore=14,
+            spaceAfter=8,
+        ),
+        "body": ParagraphStyle(
+            "ReportBody",
+            **base,
+            fontSize=10.5,
+            leading=18,
+            textColor=colors.HexColor("#111827"),
+            spaceAfter=8,
+        ),
+        "bullet": ParagraphStyle(
+            "ReportBullet",
+            **base,
+            fontSize=10.5,
+            leading=18,
+            leftIndent=12,
+            firstLineIndent=-8,
+            textColor=colors.HexColor("#111827"),
+            spaceAfter=5,
+        ),
+        "signature": ParagraphStyle(
+            "ReportSignature",
+            **base,
+            fontSize=10.5,
+            leading=18,
+            textColor=colors.HexColor("#111827"),
+            spaceBefore=8,
+            spaceAfter=8,
+        ),
+        "table_header": ParagraphStyle(
+            "ReportTableHeader",
+            **base,
+            fontSize=8.8,
+            leading=12,
+            textColor=colors.HexColor("#0f3b76"),
+        ),
+        "table_cell": ParagraphStyle(
+            "ReportTableCell",
+            **base,
+            fontSize=8.6,
+            leading=12,
+            textColor=colors.HexColor("#111827"),
+        ),
+    }
+
+
+def _build_reportlab_story(
+    blocks: list[ReportBlock],
+    styles: dict[str, object],
+    Paragraph,
+    Spacer,
+    PageBreak,
+    Table,
+    TableStyle,
+    colors,
+) -> list[object]:
+    story: list[object] = []
+    for block in blocks:
+        if block.style == "page_break":
+            story.append(PageBreak())
+            continue
+        if block.table_rows:
+            story.append(_build_reportlab_table(block, styles, Paragraph, Table, TableStyle, colors))
+            story.append(Spacer(1, 14))
+            continue
+
+        style = styles.get(block.style, styles["body"])
+        lines = _split_block_lines(block.text)
+        if not lines:
+            continue
+        for line in lines:
+            if not line:
+                story.append(Spacer(1, 6))
+                continue
+            text = escape(line)
+            if block.style == "bullet":
+                text = f"- {text}"
+            story.append(Paragraph(text, style))
+    return story or [Paragraph("暂无报告内容", styles["body"])]
+
+
+def _build_reportlab_table(
+    block: ReportBlock,
+    styles: dict[str, object],
+    Paragraph,
+    Table,
+    TableStyle,
+    colors,
+) -> object:
+    rows = [
+        [Paragraph(escape(str(cell or "-")), styles["table_header"]) for cell in block.table_headers],
+        *[
+            [Paragraph(escape(str(cell or "-")), styles["table_cell"]) for cell in row]
+            for row in block.table_rows
+        ],
+    ]
+    widths = list(block.table_column_widths) if block.table_column_widths else None
+    table = Table(rows, colWidths=widths, repeatRows=1, hAlign="LEFT", splitByRow=True)
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e8f0fb")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#0f3b76")),
+                ("GRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#c7d7ec")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+            ]
+        )
+    )
+    return table
+
+
 def _build_pdf_page_streams(blocks: list[ReportBlock]) -> list[str]:
     styles = {
         "title": {"size": 20.0, "line_height": 30.0, "before": 0.0, "after": 8.0, "indent": 0.0, "color": "0.07 0.23 0.56 rg"},
@@ -792,6 +1214,10 @@ def _build_pdf_page_streams(blocks: list[ReportBlock]) -> list[str]:
         y = PDF_PAGE_HEIGHT - PDF_MARGIN_TOP
 
     for block in blocks:
+        if block.style == "page_break":
+            if current_commands:
+                flush_page()
+            continue
         if block.table_rows:
             y = _append_pdf_table(
                 block,
@@ -898,6 +1324,11 @@ def _append_pdf_table(
 
     wrapped_headers = wrap_cells(headers, font_size=header_font_size)
     header_height = padding_y * 2 + max(len(lines) for lines in wrapped_headers) * line_height
+    wrapped_first_row = wrap_cells(rows[0], font_size=row_font_size)
+    first_row_height = padding_y * 2 + max(len(lines) for lines in wrapped_first_row) * line_height
+    if y - header_height - first_row_height < PDF_MARGIN_BOTTOM:
+        flush_page()
+        y = PDF_PAGE_HEIGHT - PDF_MARGIN_TOP
     if y - header_height < PDF_MARGIN_BOTTOM:
         flush_page()
         y = PDF_PAGE_HEIGHT - PDF_MARGIN_TOP
@@ -934,7 +1365,7 @@ def _append_pdf_table(
             is_header=False,
         )
 
-    return y - 8.0
+    return y - 18.0
 
 
 def _build_pdf_bytes(page_streams: list[str]) -> bytes:

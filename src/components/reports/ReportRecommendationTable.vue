@@ -37,17 +37,28 @@ defineProps({
     required: true
   }
 });
+
+function isFirstChoiceRow(row, firstChoice) {
+  if (!row || !firstChoice) {
+    return false;
+  }
+  return (
+    row.institutionName === firstChoice.institutionName &&
+    row.majorName === firstChoice.majorName &&
+    (row.planGroupCode || "") === (firstChoice.planGroupCode || "")
+  );
+}
 </script>
 
 <template>
   <section class="formal-report-block">
     <header class="section-head">
       <div>
-        <strong>正式院校专业推荐表</strong>
-        <span>核心交付以真实院校、专业、专业组代码、最低分和最低位次为主，画像信息仅负责解释，不参与硬录取判断。</span>
+        <strong>48 个院校专业组正式方案</strong>
+        <span>按险、冲、稳、保、垫、兜分层阅读。每一行都保留分数、位次、专业组和风险依据，便于正式填报前逐项复核。</span>
       </div>
       <el-tag type="primary">
-        共 {{ recommendationTable.length }} 条推荐
+        共 {{ recommendationTable.length }} 个专业组建议
       </el-tag>
     </header>
 
@@ -62,7 +73,7 @@ defineProps({
           <strong>{{ bucket.title }}</strong>
         </div>
         <p>{{ bucket.description }}</p>
-        <span>{{ recommendationBuckets[bucket.key].length }} 条</span>
+        <span>{{ recommendationBuckets[bucket.key].length }} 个专业组</span>
       </article>
     </div>
 
@@ -138,64 +149,70 @@ defineProps({
             <span>{{ bucket.description }}</span>
           </div>
           <el-tag :type="bucket.tagType">
-            {{ recommendationBuckets[bucket.key].length }} 条
+            {{ recommendationBuckets[bucket.key].length }} 个专业组
           </el-tag>
         </header>
 
-        <el-table
+        <div
           v-if="recommendationBuckets[bucket.key].length"
-          :data="recommendationBuckets[bucket.key]"
-          stripe
-          class="report-table"
+          class="recommendation-card-list"
         >
-          <el-table-column label="院校 / 城市" min-width="190">
-            <template #default="{ row }">
-              <div class="cell-stack">
-                <strong>{{ row.institutionName }}</strong>
-                <span>{{ row.cityText || row.city || row.province || "待补充城市" }}</span>
+          <article
+            v-for="(row, index) in recommendationBuckets[bucket.key]"
+            :key="`${row.institutionName}-${row.majorName}-${row.planGroupCode}-${index}`"
+            class="recommendation-card"
+          >
+            <header class="recommendation-card-head">
+              <div>
+                <small>{{ row.displayTierLabel || row.bucketLabel || bucket.shortTitle || `第 ${index + 1} 项` }}</small>
+                <h3>{{ row.institutionName }}</h3>
+                <p>{{ row.cityText || row.city || row.province || "待补充城市" }}</p>
               </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="专业 / 专业组" min-width="210">
-            <template #default="{ row }">
-              <div class="cell-stack">
-                <strong>{{ row.majorName }}</strong>
-                <span>{{ row.planGroupCode || row.batchCode || "待补充代码" }}</span>
+              <div class="recommendation-tags">
+                <el-tag
+                  v-if="isFirstChoiceRow(row, firstChoice)"
+                  type="success"
+                  size="small"
+                >
+                  第一志愿
+                </el-tag>
+                <el-tag :type="riskTagType(row.riskLevel)" size="small">
+                  {{ row.riskLabel || "待复核" }}
+                </el-tag>
               </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="最低分 / 位次" min-width="150">
-            <template #default="{ row }">
-              <div class="cell-stack">
-                <strong>{{ formatScore(row.minScore) }}</strong>
-                <span>{{ formatRank(row.minRank) }}</span>
+            </header>
+
+            <div class="recommendation-major">
+              <strong>{{ row.majorName }}</strong>
+              <span>{{ row.planGroupCode || row.batchCode || "待补充专业组代码" }}</span>
+            </div>
+
+            <dl class="recommendation-metrics">
+              <div>
+                <dt>最低分</dt>
+                <dd>{{ formatScore(row.minScore) }}</dd>
               </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="位次差 / 分差" min-width="150">
-            <template #default="{ row }">
-              <div class="cell-stack">
-                <strong>{{ formatRankGap(row.rankGap) }}</strong>
-                <span>{{ formatGap(row.scoreGap) }}</span>
+              <div>
+                <dt>最低位次</dt>
+                <dd>{{ formatRank(row.minRank) }}</dd>
               </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="风险等级" min-width="110">
-            <template #default="{ row }">
-              <el-tag :type="riskTagType(row.riskLevel)">
-                {{ row.riskLabel || "待复核" }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="推荐理由与提示" min-width="340">
-            <template #default="{ row }">
-              <div class="reason-stack">
-                <p>{{ row.recommendationReason || "待补充推荐理由" }}</p>
-                <span>{{ row.riskSummary || "待补充风险摘要" }}</span>
+              <div>
+                <dt>位次差</dt>
+                <dd>{{ formatRankGap(row.rankGap) }}</dd>
               </div>
-            </template>
-          </el-table-column>
-        </el-table>
+              <div>
+                <dt>分差</dt>
+                <dd>{{ formatGap(row.scoreGap) }}</dd>
+              </div>
+            </dl>
+
+            <div class="recommendation-reason">
+              <strong>推荐理由</strong>
+              <p>{{ row.recommendationReason || "待补充推荐理由" }}</p>
+              <span>{{ row.riskSummary || "待补充风险摘要" }}</span>
+            </div>
+          </article>
+        </div>
 
         <div v-else class="table-empty">
           当前版本暂未生成该梯度的推荐项。
@@ -208,10 +225,10 @@ defineProps({
 <style scoped>
 .formal-report-block {
   margin-bottom: 20px;
-  padding: 18px;
-  border-radius: 20px;
-  border: 1px solid rgba(66, 133, 244, 0.12);
-  background: linear-gradient(180deg, rgba(66, 133, 244, 0.08), rgba(66, 133, 244, 0.03));
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #ffffff;
 }
 
 .section-head {
@@ -246,9 +263,9 @@ defineProps({
 
 .bucket-stat-card {
   padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(66, 133, 244, 0.1);
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .bucket-stat-head {
@@ -276,9 +293,9 @@ defineProps({
 .first-choice-card {
   margin: 18px 0;
   padding: 18px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(66, 133, 244, 0.14);
+  border-radius: 8px;
+  background: #fbfcf8;
+  border: 1px solid rgba(15, 118, 110, 0.2);
 }
 
 .first-choice-main {
@@ -312,9 +329,9 @@ defineProps({
 .choice-metrics div,
 .choice-grid article {
   padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(66, 133, 244, 0.06);
-  border: 1px solid rgba(66, 133, 244, 0.1);
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .choice-metrics small,
@@ -345,31 +362,147 @@ defineProps({
 
 .bucket-table-block {
   padding: 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(66, 133, 244, 0.1);
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
-.report-table :deep(.el-table__cell) {
-  vertical-align: top;
-}
-
-.cell-stack,
-.reason-stack {
+.recommendation-card-list {
   display: grid;
-  gap: 4px;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
 }
 
-.cell-stack strong,
-.reason-stack p {
-  margin: 0;
+.recommendation-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: #f8fafc;
 }
 
-.cell-stack span,
-.reason-stack span {
+.recommendation-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recommendation-card-head div {
+  min-width: 0;
+}
+
+.recommendation-card-head small {
+  display: block;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.recommendation-card-head h3 {
+  margin: 5px 0 4px;
+  color: #111827;
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.recommendation-card-head p,
+.recommendation-major span,
+.recommendation-reason span {
   color: var(--app-text-secondary);
   font-size: 12px;
   line-height: 1.6;
+}
+
+.recommendation-card-head p,
+.recommendation-reason p {
+  margin: 0;
+}
+
+.recommendation-tags {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.recommendation-major {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.recommendation-major strong {
+  color: #111827;
+  line-height: 1.45;
+}
+
+.recommendation-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.recommendation-metrics div {
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.recommendation-metrics dt {
+  color: var(--app-text-secondary);
+  font-size: 12px;
+}
+
+.recommendation-metrics dd {
+  margin: 4px 0 0;
+  color: #111827;
+  font-weight: 800;
+  word-break: break-word;
+}
+
+.recommendation-reason {
+  display: grid;
+  gap: 5px;
+}
+
+.recommendation-reason strong {
+  color: #475467;
+  font-size: 13px;
+}
+
+.recommendation-reason p {
+  color: #334155;
+  line-height: 1.72;
+}
+
+.recommendation-reason span {
+  display: block;
+  padding-top: 4px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.recommendation-card :deep(.el-tag) {
+  max-width: 100%;
+}
+
+.recommendation-card :deep(.el-tag__content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-stack small {
+  font-weight: 700;
 }
 
 .table-empty {
@@ -377,8 +510,8 @@ defineProps({
   text-align: center;
   color: var(--app-text-secondary);
   border: 1px dashed rgba(66, 133, 244, 0.2);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.74);
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 @media (max-width: 1199px) {
@@ -389,13 +522,23 @@ defineProps({
 
 @media (max-width: 767px) {
   .section-head,
-  .bucket-stat-head {
+  .bucket-stat-head,
+  .recommendation-card-head {
     flex-direction: column;
     align-items: flex-start;
   }
 
   .choice-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .recommendation-card-list,
+  .recommendation-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .recommendation-tags {
+    justify-content: flex-start;
   }
 }
 </style>

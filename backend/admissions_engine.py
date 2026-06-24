@@ -29,6 +29,12 @@ from backend.admissions_scoring import (
     _evaluate_score_bucket,
     _resolve_candidate_bucket,
 )
+from backend.admissions_strategy import (
+    HENAN_2026_TOTAL_CHOICE_TARGET,
+    bucket_target_ratios,
+    default_strategy_note,
+    resolve_strategy_profile,
+)
 from backend.admissions_context import (
     BATCH_PRIORITY,
     DECLARED_BATCH_ALIASES,
@@ -159,6 +165,24 @@ def _summarize_probability(student_rank: int | None, student_score: float, histo
 
 
 def _summarize_plan_risk(history_rows: list[dict[str, Any]]) -> dict[str, Any]:
+    ranks = [safe_int(item.get("min_rank")) for item in history_rows if safe_int(item.get("min_rank")) > 0]
+    if len(ranks) >= 3:
+        sorted_ranks = sorted(ranks)
+        median_rank = sorted_ranks[len(sorted_ranks) // 2]
+        volatility_ratio = (max(ranks) - min(ranks)) / max(median_rank, 1)
+        if volatility_ratio > 0.10:
+            return {
+                "level": "high",
+                "label": "大小年位次波动",
+                "note": "近年最低位次波动超过 10%，存在大小年风险，需结合当年计划和专业组热度人工复核。",
+            }
+        if volatility_ratio > 0.05:
+            return {
+                "level": "medium",
+                "label": "位次波动需关注",
+                "note": "近年最低位次波动超过 5%，建议不要作为唯一核心保底依据。",
+            }
+
     planned = [(int(item["exam_year"]), safe_int(item.get("planned_count"))) for item in history_rows if safe_int(item.get("planned_count")) > 0]
     if len(planned) < 2:
         return {
@@ -387,22 +411,42 @@ def group_major_recommendations(candidates: list[dict[str, Any]]) -> list[dict[s
 def build_plan_columns_from_candidates(candidates: list[dict[str, Any]], context: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     prepared = _prepare_recommendation_outputs(candidates, context)
     grouped = prepared["bucketed_candidates"]
+    tiered = prepared["tiered_candidates"]
+    profile = prepared.get("strategy_profile") or resolve_strategy_profile(context.get("admissions_strategy_mode"))
     recommendation_table = prepared["recommendation_table"]
     counts = {bucket: len(items) for bucket, items in grouped.items()}
-    total = sum(counts.values()) or 1
+    tier_counts = {tier["key"]: len(tiered.get(tier["key"], [])) for tier in profile["tiers"]}
     strategy = {
-        "rush_ratio": round(counts["rush"] / total * 100),
-        "steady_ratio": round(counts["steady"] / total * 100),
-        "safe_ratio": round(counts["safe"] / total * 100),
+        **bucket_target_ratios(profile["bucket_targets"]),
+        "mode": profile["mode"],
+        "name": profile["name"],
+        "rush_count": counts["rush"],
+        "steady_count": counts["steady"],
+        "safe_count": counts["safe"],
+        "display_tier_counts": tier_counts,
+        "display_tiers": [
+            {
+                "key": tier["key"],
+                "bucket": tier["bucket"],
+                "target": tier["target"],
+                "shortTitle": tier["label"],
+                "title": tier["title"],
+                "tagLabel": tier["tag"],
+                "tagType": tier["variant"],
+                "description": tier["description"],
+            }
+            for tier in profile["tiers"]
+        ],
+        "total_choice_target": HENAN_2026_TOTAL_CHOICE_TARGET,
         "average_major_score": round(sum(item["compositeScore"] for item in recommendation_table[:6]) / max(1, min(6, len(recommendation_table))), 1) if recommendation_table else 0,
-        "note": "本轮正式方案已按 3/5/3 的冲稳保目标配比做去重和邻档补位，正式填报前仍需复核院校专业组、调剂与年度计划。",
+        "note": default_strategy_note(profile["mode"]),
     }
 
     columns: list[dict[str, Any]] = []
-    for bucket in BUCKET_ORDER:
-        bucket_meta = BUCKET_META[bucket]
+    for tier in profile["tiers"]:
+        bucket = str(tier["bucket"])
         cards = []
-        for item in grouped[bucket]:
+        for item in tiered.get(tier["key"], []):
             rank_gap = item.get("rank_gap")
             score_gap = item.get("score_gap")
             risk_note = f"重点风险：{'；'.join(risk['label'] for risk in item['risks'][:2])}" if item["risks"] else ""
@@ -435,13 +479,15 @@ def build_plan_columns_from_candidates(candidates: list[dict[str, Any]], context
 
         columns.append(
             {
-                "title": bucket_meta["title"],
+                "key": tier["key"],
+                "bucket": bucket,
+                "title": tier["title"],
                 "note": (
-                    f"当前正式推荐 {counts[bucket]} 条，建议按 {bucket_meta['title']} 思路配置志愿，"
+                    f"当前正式推荐 {len(cards)} 条，建议按 {tier['title']} 思路配置志愿，"
                     "并继续复核院校专业组、调剂和计划波动。"
                 ),
-                "tagLabel": bucket_meta["tag"],
-                "tagVariant": bucket_meta["variant"],
+                "tagLabel": tier["tag"],
+                "tagVariant": tier["variant"],
                 "cards": cards,
             }
         )

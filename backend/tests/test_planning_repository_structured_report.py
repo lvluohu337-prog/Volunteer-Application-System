@@ -3,7 +3,11 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from backend.planning_repository import _build_formal_report_json, _build_structured_recommendations
+from backend.planning_repository import (
+    _build_formal_report_json,
+    _build_real_rule_summary,
+    _build_structured_recommendations,
+)
 
 
 class PlanningRepositoryStructuredReportTest(unittest.TestCase):
@@ -80,6 +84,53 @@ class PlanningRepositoryStructuredReportTest(unittest.TestCase):
         self.assertTrue(report_json["resultSource"]["isRealData"])
         self.assertEqual(report_json["firstChoice"]["institutionName"], "郑州大学")
         self.assertEqual(report_json["recommendationTable"][0]["majorName"], "自动化类")
+
+
+    def test_real_rule_summary_includes_family_facing_conclusion_and_review_checklist(self):
+        recommendation = {
+            "institutionName": "测试大学",
+            "majorName": "计算机科学与技术",
+            "displayTierLabel": "稳",
+            "displayTierTitle": "稳妥主力",
+            "riskLabel": "中等风险",
+            "probabilityLabel": "录取概率中高",
+            "recommendationReason": "位次具备一定优势。",
+        }
+        bundle = {
+            "context": {"latest_year": 2025, "rank_source": "official", "candidate_strategy": "rank_and_score"},
+            "candidates": [{"institution_name": "测试大学", "major_name": "计算机科学与技术", "risks": []}],
+            "recommendation_table": [recommendation],
+            "first_choice": recommendation,
+            "alternatives": [],
+            "not_recommended": [],
+        }
+        strategy = {
+            "name": "稳妥型",
+            "mode": "conservative",
+            "total_choice_target": 48,
+            "display_tier_counts": {
+                "risk": 5,
+                "sprint": 5,
+                "steady": 16,
+                "protect": 12,
+                "cushion": 5,
+                "fallback": 5,
+            },
+        }
+
+        summary = _build_real_rule_summary(
+            {"name": "测试学生", "province": "河南"},
+            bundle,
+            strategy,
+            [],
+            {"preferredDirection": "计算机方向"},
+        )
+
+        self.assertIn("finalConclusion", summary)
+        self.assertIn("稳妥型", summary["finalConclusion"])
+        self.assertIn("测试大学", summary["finalConclusion"])
+        self.assertIn("reviewChecklist", summary)
+        self.assertIn("招生章程", summary["reviewChecklist"])
 
 
 if __name__ == "__main__":

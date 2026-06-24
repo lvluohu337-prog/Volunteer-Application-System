@@ -51,9 +51,23 @@ const emit = defineEmits(["switch-product"]);
     </div>
     <p class="table-note">
       {{ ruleSummary.scoreLevel || "待补充分层判断" }}
-      / 冲 {{ ruleSummary.strategy?.rush_ratio || 0 }}%
-      / 稳 {{ ruleSummary.strategy?.steady_ratio || 0 }}%
-      / 保 {{ ruleSummary.strategy?.safe_ratio || 0 }}%
+      <template v-if="ruleSummary.strategy?.total_choice_target">
+        / {{ ruleSummary.strategy.total_choice_target }} 个院校专业组
+      </template>
+      <template v-if="ruleSummary.strategy?.display_tiers?.length > 3">
+        / {{ ruleSummary.strategy.name || "策略" }}
+        <span
+          v-for="tier in ruleSummary.strategy.display_tiers"
+          :key="tier.key"
+        >
+          / {{ tier.shortTitle }}{{ ruleSummary.strategy.display_tier_counts?.[tier.key] ?? tier.target }}
+        </span>
+      </template>
+      <template v-else>
+        / 冲 {{ ruleSummary.strategy?.rush_ratio || 0 }}%
+        / 稳 {{ ruleSummary.strategy?.steady_ratio || 0 }}%
+        / 保 {{ ruleSummary.strategy?.safe_ratio || 0 }}%
+      </template>
     </p>
     <el-alert
       v-if="plannedProductNotice"

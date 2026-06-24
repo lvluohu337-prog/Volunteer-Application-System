@@ -761,6 +761,8 @@ def _build_formal_report_json(
             "subjectGroup": student.get("subject_group") or "",
             "admissionBatch": student.get("admission_batch") or "",
             "currentStatus": student.get("status") or "draft",
+            "totalScore": student.get("total_score") or student.get("final_score") or "",
+            "rank": student.get("rank") or student.get("final_rank") or "",
         },
         "decisionSummary": {
             "scoreLevel": rule_summary.get("scoreLevel") or "",
@@ -1140,6 +1142,34 @@ def _build_real_major_cards(bundle: dict[str, Any]) -> list[dict[str, Any]]:
     return group_major_recommendations(bundle.get("candidates") or [])
 
 
+def _build_family_final_conclusion(strategy: dict[str, Any], first_choice: dict[str, Any] | None) -> str:
+    strategy_name = strategy.get("name") or "当前策略"
+    target = strategy.get("total_choice_target") or strategy.get("totalChoices") or 48
+    if first_choice:
+        institution = first_choice.get("institutionName") or "目标院校"
+        major = first_choice.get("majorName") or "目标专业"
+        return (
+            f"建议采用{strategy_name}，围绕 {target} 个院校专业组形成正式方案。"
+            f"第一志愿优先关注 {institution} - {major}，"
+            "正式填报前继续复核招生章程、组内专业接受度和调剂边界。"
+        )
+    return (
+        f"建议采用{strategy_name}，围绕 {target} 个院校专业组形成正式方案，"
+        "正式填报前继续完成招生章程、专业组和调剂规则复核。"
+    )
+
+
+def _build_family_review_checklist() -> list[str]:
+    return [
+        "招生章程",
+        "组内 6 个专业接受度",
+        "是否服从调剂",
+        "体检/单科/语种/性别限制",
+        "当年招生计划变化",
+        "最终志愿系统录入顺序",
+    ]
+
+
 def _build_real_rule_summary(
     student: dict[str, Any],
     bundle: dict[str, Any],
@@ -1209,6 +1239,8 @@ def _build_real_rule_summary(
         "latestAdmissionYear": context.get("latest_year"),
         "rankSource": context.get("rank_source"),
         "topRisks": risk_items[:6],
+        "finalConclusion": _build_family_final_conclusion(strategy, first_choice),
+        "reviewChecklist": _build_family_review_checklist(),
         "recommendationTable": recommendation_table,
         "firstChoice": first_choice,
         "alternatives": structured_recommendations["alternatives"],
@@ -1931,7 +1963,7 @@ def get_student_analysis(student_id: int) -> dict[str, Any]:
                 {"title": "当前总分", "value": f"{score_profile['total_score']}", "note": "来自学生档案中的当前有效分数。"},
                 {"title": "当前位次", "value": str(context.get("rank") or "待补充"), "note": "已优先使用正式位次，其次才使用一分一段估算。"},
                 {"title": "真实候选数", "value": str(len(admissions_bundle["candidates"])), "note": f"基于 {context.get('latest_year') or '最近'} 年真实招生数据筛出。"},
-                {"title": "冲稳保比例", "value": f"{strategy['rush_ratio']}/{strategy['steady_ratio']}/{strategy['safe_ratio']}", "note": "来自真实候选分布的分层建议。"},
+                {"title": "冲稳保比例", "value": f"{strategy['rush_ratio']}/{strategy['steady_ratio']}/{strategy['safe_ratio']}", "note": "按河南 2026 普通本科批院校专业组结构生成。"},
             ],
             "buckets": _build_real_analysis_buckets(admissions_bundle["candidates"]),
             "subjectBars": _subject_bars(student),
@@ -1978,7 +2010,7 @@ def get_student_analysis(student_id: int) -> dict[str, Any]:
             {
                 "title": "冲稳保比例",
                 "value": f"{strategy['rush_ratio']}/{strategy['steady_ratio']}/{strategy['safe_ratio']}",
-                "note": "分别对应冲刺、稳妥、保底建议占比。",
+                "note": "分别对应冲刺、稳妥、保底建议占比，正式方案需按院校专业组复核。",
             },
         ],
         "buckets": [

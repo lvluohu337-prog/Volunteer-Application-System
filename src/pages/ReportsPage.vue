@@ -12,9 +12,13 @@ import FallbackRiskNotice from "../components/FallbackRiskNotice.vue";
 import PageHeader from "../components/PageHeader.vue";
 import ProductFlowGuide from "../components/ProductFlowGuide.vue";
 import RequestErrorNotice from "../components/RequestErrorNotice.vue";
+import ReportCoreConclusion from "../components/reports/ReportCoreConclusion.vue";
+import ReportEvidencePanel from "../components/reports/ReportEvidencePanel.vue";
+import ReportHeroSummary from "../components/reports/ReportHeroSummary.vue";
 import ReportOutlineCard from "../components/reports/ReportOutlineCard.vue";
 import ReportProductCatalog from "../components/reports/ReportProductCatalog.vue";
 import ReportRecommendationTable from "../components/reports/ReportRecommendationTable.vue";
+import ReportReviewChecklist from "../components/reports/ReportReviewChecklist.vue";
 import ReportResultSourceBanner from "../components/reports/ReportResultSourceBanner.vue";
 import ReportTraceabilityPanel from "../components/reports/ReportTraceabilityPanel.vue";
 import {
@@ -60,7 +64,7 @@ const emptyPortraitRecommendation = {
   auxiliaryExplanation: []
 };
 
-const bucketDefinitions = [
+const defaultBucketDefinitions = [
   {
     key: "rush",
     title: "冲刺推荐",
@@ -83,6 +87,20 @@ const bucketDefinitions = [
     description: "用于守住底线，仍需关注调剂接受度与专业接受度。"
   }
 ];
+
+const bucketDefinitions = computed(() => {
+  const displayTiers = ruleSummary.value.strategy?.display_tiers;
+  if (!Array.isArray(displayTiers) || !displayTiers.length) {
+    return defaultBucketDefinitions;
+  }
+  return displayTiers.map((tier) => ({
+    key: tier.key,
+    title: tier.title,
+    shortTitle: tier.shortTitle || tier.label || tier.title,
+    tagType: tier.tagType || "primary",
+    description: tier.description || "待补充分档说明。"
+  }));
+});
 
 const loading = ref(true);
 const loadError = ref("");
@@ -231,9 +249,9 @@ const fallbackNextSteps = [
 const complianceRules = COMPLIANCE_COPY_RULES;
 
 const recommendationBuckets = computed(() => {
-  const grouped = { rush: [], steady: [], safe: [] };
+  const grouped = Object.fromEntries(bucketDefinitions.value.map((bucket) => [bucket.key, []]));
   recommendationTable.value.forEach((item) => {
-    const bucketKey = item.bucket;
+    const bucketKey = item.displayTier || item.bucket;
     if (grouped[bucketKey]) {
       grouped[bucketKey].push(item);
     }
@@ -505,11 +523,16 @@ async function handleDeliveryDownload(record, options = {}) {
 
   downloadingRecordId.value = record.id;
   try {
-    await downloadReportDelivery(studentId.value, record.id, record.artifact_name || "");
+    const isPdf = String(record.export_format || "").toLowerCase() === "pdf";
+    await downloadReportDelivery(studentId.value, record.id, record.artifact_name || "", {
+      previewInNewTab: options.previewInNewTab ?? isPdf
+    });
     if (!options.silentSuccess) {
       emit(
         "open-dialog",
-        `${(record.export_format || "文件").toUpperCase()} 下载已开始：${record.artifact_name || "正式交付文件"}`
+        `${(record.export_format || "文件").toUpperCase()} 下载已开始：${record.artifact_name || "正式交付文件"}${
+          isPdf ? "\nPDF 已同步打开预览标签，可直接查看内容。" : ""
+        }`
       );
     }
   } catch {
@@ -584,6 +607,21 @@ watch(
             @navigate="goToProductFlowTarget"
           />
 
+          <ReportHeroSummary
+            :title="reportTitle"
+            :subtitle="reportSubtitle"
+            :active-product-label="activeProductLabel"
+            :rule-summary="ruleSummary"
+            :result-source="resultSource"
+            :result-source-facts="resultSourceFacts"
+            :has-formal-report-result="hasFormalReportResult"
+            :exporting="exporting"
+            :active-delivery-channels="activeDeliveryChannels"
+            @view-student="goToStudentDetail"
+            @export-pdf="runExport('pdf')"
+            @export-word="runExport('word')"
+          />
+
           <ReportResultSourceBanner
             :meta="resultSourceMeta"
             :result-source="resultSource"
@@ -609,6 +647,15 @@ watch(
           </FallbackRiskNotice>
 
           <template v-if="hasFormalReportResult">
+          <ReportCoreConclusion
+            :first-choice="firstChoice"
+            :rule-summary="ruleSummary"
+            :top-risk-notes="topRiskNotes"
+            :format-score="formatScore"
+            :format-rank="formatRank"
+            :format-rank-gap="formatRankGap"
+          />
+
           <ReportOutlineCard
             :active-product-code="activeProductCode"
             :active-product-label="activeProductLabel"
@@ -659,6 +706,15 @@ watch(
               :format-rank-gap="formatRankGap"
               :risk-tag-type="riskTagType"
             />
+
+            <ReportEvidencePanel
+              :result-source="resultSource"
+              :result-source-facts="resultSourceFacts"
+              :recommendation-table="recommendationTable"
+              :top-risk-notes="topRiskNotes"
+            />
+
+            <ReportReviewChecklist :items="ruleSummary.reviewChecklist" />
 
             <section class="formal-report-block">
               <header class="section-head">
@@ -745,38 +801,37 @@ watch(
 
               <section v-if="paperRecommendations.length" class="paper-section">
                 <h3>冲稳保推荐表</h3>
-                <div class="paper-table-wrapper">
-                  <table class="paper-table">
-                    <thead>
-                      <tr>
-                        <th>梯度</th>
-                        <th>院校</th>
-                        <th>专业</th>
-                        <th>专业组/代码</th>
-                        <th>城市</th>
-                        <th>最低分</th>
-                        <th>最低位次</th>
-                        <th>位次差</th>
-                        <th>风险</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr
-                        v-for="item in paperRecommendations"
-                        :key="`${item.institutionName}-${item.majorName}-${item.planGroupCode}-${item.bucket}`"
-                      >
-                        <td>{{ item.bucketLabel || item.bucket }}</td>
-                        <td>{{ item.institutionName }}</td>
-                        <td>{{ item.majorName }}</td>
-                        <td>{{ item.planGroupCode || item.batchCode || "-" }}</td>
-                        <td>{{ item.cityText || item.city || item.province || "-" }}</td>
-                        <td>{{ formatScore(item.minScore) }}</td>
-                        <td>{{ formatRank(item.minRank) }}</td>
-                        <td>{{ formatRankGap(item.rankGap) }}</td>
-                        <td>{{ item.riskLabel || "待复核" }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div class="paper-recommendation-list">
+                  <article
+                    v-for="item in paperRecommendations"
+                    :key="`${item.institutionName}-${item.majorName}-${item.planGroupCode}-${item.bucket}`"
+                    class="paper-recommendation-card"
+                  >
+                    <header>
+                      <span>{{ item.displayTierLabel || item.bucketLabel || item.bucket || "分层待确认" }}</span>
+                      <strong>{{ item.institutionName }}</strong>
+                      <small>{{ item.cityText || item.city || item.province || "-" }}</small>
+                    </header>
+                    <p>{{ item.majorName }} / {{ item.planGroupCode || item.batchCode || "-" }}</p>
+                    <dl>
+                      <div>
+                        <dt>最低分</dt>
+                        <dd>{{ formatScore(item.minScore) }}</dd>
+                      </div>
+                      <div>
+                        <dt>最低位次</dt>
+                        <dd>{{ formatRank(item.minRank) }}</dd>
+                      </div>
+                      <div>
+                        <dt>位次差</dt>
+                        <dd>{{ formatRankGap(item.rankGap) }}</dd>
+                      </div>
+                      <div>
+                        <dt>风险</dt>
+                        <dd>{{ item.riskLabel || "待复核" }}</dd>
+                      </div>
+                    </dl>
+                  </article>
                 </div>
               </section>
 
@@ -938,9 +993,9 @@ watch(
 <style scoped>
 .module-card {
   padding: 16px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(66, 133, 244, 0.1);
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .module-card strong,
@@ -962,9 +1017,9 @@ watch(
 
 .summary-card {
   padding: 16px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(66, 133, 244, 0.12), rgba(66, 133, 244, 0.04));
-  border: 1px solid rgba(66, 133, 244, 0.12);
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .summary-card span {
@@ -992,9 +1047,9 @@ watch(
 .policy-highlight-block {
   margin-bottom: 20px;
   padding: 18px;
-  border-radius: 20px;
-  border: 1px solid rgba(66, 133, 244, 0.12);
-  background: linear-gradient(180deg, rgba(66, 133, 244, 0.08), rgba(66, 133, 244, 0.03));
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #ffffff;
 }
 
 .section-head {
@@ -1033,9 +1088,9 @@ watch(
 .decision-card,
 .policy-highlight-card {
   padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(66, 133, 244, 0.1);
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .decision-head {
@@ -1070,9 +1125,9 @@ watch(
 
 .decision-item {
   padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(66, 133, 244, 0.05);
-  border: 1px solid rgba(66, 133, 244, 0.08);
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .decision-item-danger {
@@ -1084,29 +1139,67 @@ watch(
   margin: 8px 0 0;
 }
 
-.paper-table-wrapper {
-  overflow-x: auto;
+.paper-recommendation-list {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
-.paper-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
+.paper-recommendation-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
 }
 
-.paper-table th,
-.paper-table td {
-  padding: 10px 8px;
-  border: 1px solid #e5edf5;
-  text-align: left;
-  vertical-align: top;
-  line-height: 1.6;
+.paper-recommendation-card header {
+  display: grid;
+  gap: 3px;
 }
 
-.paper-table th {
-  background: #f6f9fd;
+.paper-recommendation-card header span {
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.paper-recommendation-card header strong {
+  color: var(--app-text-primary);
+  line-height: 1.4;
+}
+
+.paper-recommendation-card header small,
+.paper-recommendation-card p,
+.paper-recommendation-card dt {
   color: var(--app-text-secondary);
-  font-weight: 600;
+}
+
+.paper-recommendation-card p {
+  margin: 8px 0 10px;
+  line-height: 1.65;
+}
+
+.paper-recommendation-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.paper-recommendation-card div {
+  min-width: 0;
+}
+
+.paper-recommendation-card dt {
+  font-size: 12px;
+}
+
+.paper-recommendation-card dd {
+  margin: 3px 0 0;
+  color: var(--app-text-primary);
+  font-weight: 700;
+  word-break: break-word;
 }
 
 .paper-list {

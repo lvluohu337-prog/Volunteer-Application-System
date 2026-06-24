@@ -3,7 +3,11 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from backend.admissions_engine import _build_candidate_match_result, build_plan_columns_from_candidates
+from backend.admissions_engine import (
+    _build_candidate_match_result,
+    _summarize_plan_risk,
+    build_plan_columns_from_candidates,
+)
 from backend.admissions_presenter import _prepare_recommendation_outputs
 from backend.admissions_query import _candidate_pair_clause
 from backend.admissions_scoring import (
@@ -11,6 +15,7 @@ from backend.admissions_scoring import (
     _evaluate_score_bucket,
     _resolve_candidate_bucket,
 )
+from backend.admissions_strategy import resolve_strategy_profile
 
 
 def _candidate(index: int, bucket: str, composite_score: float, risk_level: str = "medium") -> dict:
@@ -48,6 +53,13 @@ def _candidate(index: int, bucket: str, composite_score: float, risk_level: str 
         "score_gap": 8.0 - index * 0.1,
         "risk_level": risk_level,
     }
+
+
+def _many_candidates(bucket: str, start: int, count: int) -> list[dict]:
+    return [
+        _candidate(start + index, bucket, 90.0 - index * 0.1, risk_level="low")
+        for index in range(count)
+    ]
 
 
 class AdmissionsEngineTest(unittest.TestCase):
@@ -131,7 +143,95 @@ class AdmissionsEngineTest(unittest.TestCase):
         weak_score_result = _evaluate_score_bucket(540, row)
         self.assertEqual(_resolve_candidate_bucket(weak_rank_result, weak_score_result, {"score": 30}), "out")
 
-    def test_prepare_recommendation_outputs_balances_to_353_targets(self):
+    def test_rank_bucket_uses_henan_2026_rank_percentage_bands(self):
+        student_rank = 50000
+
+        self.assertEqual(_evaluate_rank_bucket(student_rank, {"min_rank": 45000})["bucket"], "rush")
+        self.assertEqual(_evaluate_rank_bucket(student_rank, {"min_rank": 48500})["bucket"], "steady")
+        self.assertEqual(_evaluate_rank_bucket(student_rank, {"min_rank": 51500})["bucket"], "steady")
+        self.assertEqual(_evaluate_rank_bucket(student_rank, {"min_rank": 55000})["bucket"], "safe")
+        self.assertEqual(_evaluate_rank_bucket(student_rank, {"min_rank": 57500})["bucket"], "safe")
+
+    def test_plan_risk_flags_large_rank_volatility(self):
+        result = _summarize_plan_risk(
+            [
+                {"exam_year": 2023, "planned_count": 12, "min_rank": 50000},
+                {"exam_year": 2024, "planned_count": 12, "min_rank": 56000},
+                {"exam_year": 2025, "planned_count": 12, "min_rank": 43000},
+            ]
+        )
+
+        self.assertEqual(result["level"], "high")
+        self.assertIn("大小年", result["label"])
+
+    def test_prepare_recommendation_outputs_balances_to_henan_2026_48_group_targets(self):
+        candidates = (
+            _many_candidates("rush", 1, 20)
+            + _many_candidates("steady", 101, 30)
+            + _many_candidates("safe", 201, 20)
+        )
+
+        prepared = _prepare_recommendation_outputs(candidates, {"latest_year": 2025, "score": 580, "rank": 12000})
+        bucketed = prepared["bucketed_candidates"]
+
+        self.assertEqual(len(bucketed["rush"]), 14)
+        self.assertEqual(len(bucketed["steady"]), 24)
+        self.assertEqual(len(bucketed["safe"]), 10)
+        self.assertEqual(len(prepared["recommendation_table"]), 48)
+
+    def test_conservative_strategy_exposes_six_tier_targets(self):
+        profile = resolve_strategy_profile("conservative")
+
+        self.assertEqual(profile["mode"], "conservative")
+        self.assertEqual(profile["bucket_targets"], {"rush": 10, "steady": 16, "safe": 22})
+        self.assertEqual(
+            {tier["key"]: tier["target"] for tier in profile["tiers"]},
+            {
+                "risk": 5,
+                "sprint": 5,
+                "steady": 16,
+                "protect": 12,
+                "cushion": 5,
+                "fallback": 5,
+            },
+        )
+
+    def test_conservative_strategy_splits_recommendations_into_six_display_tiers(self):
+        candidates = (
+            _many_candidates("rush", 1, 20)
+            + _many_candidates("steady", 101, 30)
+            + _many_candidates("safe", 201, 30)
+        )
+
+        prepared = _prepare_recommendation_outputs(
+            candidates,
+            {
+                "latest_year": 2025,
+                "score": 580,
+                "rank": 12000,
+                "admissions_strategy_mode": "conservative",
+            },
+        )
+        tiered = prepared["tiered_candidates"]
+
+        self.assertEqual([len(tiered[key]) for key in ("risk", "sprint", "steady", "protect", "cushion", "fallback")], [5, 5, 16, 12, 5, 5])
+        self.assertEqual(len(prepared["recommendation_table"]), 48)
+        self.assertEqual(prepared["recommendation_table"][0]["displayTier"], "risk")
+        self.assertEqual(prepared["recommendation_table"][0]["displayTierLabel"], "险")
+        self.assertEqual(prepared["recommendation_table"][-1]["displayTier"], "fallback")
+
+    def test_prepare_recommendation_outputs_dedupes_same_college_major_group(self):
+        first = _candidate(1, "steady", 80.0)
+        second = _candidate(2, "steady", 92.0)
+        second["institution_id"] = first["institution_id"]
+        second["plan_group_code"] = first["plan_group_code"]
+
+        prepared = _prepare_recommendation_outputs([first, second], {"latest_year": 2025, "score": 580, "rank": 12000})
+
+        self.assertEqual(len(prepared["recommendation_table"]), 1)
+        self.assertEqual(prepared["recommendation_table"][0]["majorName"], second["major_name"])
+
+    def test_prepare_recommendation_outputs_balances_available_candidates_without_overfilling_rush(self):
         candidates = [
             _candidate(1, "rush", 70.0),
             _candidate(2, "steady", 82.0),
@@ -149,9 +249,9 @@ class AdmissionsEngineTest(unittest.TestCase):
         prepared = _prepare_recommendation_outputs(candidates, {"latest_year": 2025, "score": 580, "rank": 12000})
         bucketed = prepared["bucketed_candidates"]
 
-        self.assertEqual(len(bucketed["rush"]), 3)
-        self.assertEqual(len(bucketed["steady"]), 5)
-        self.assertEqual(len(bucketed["safe"]), 3)
+        self.assertEqual(len(bucketed["rush"]), 1)
+        self.assertEqual(len(bucketed["steady"]), 8)
+        self.assertEqual(len(bucketed["safe"]), 2)
         self.assertIsNotNone(prepared["first_choice"])
         self.assertEqual(prepared["first_choice"]["bucket"], "steady")
         self.assertEqual(len(prepared["alternatives"]), 5)
@@ -173,10 +273,35 @@ class AdmissionsEngineTest(unittest.TestCase):
 
         columns, strategy = build_plan_columns_from_candidates(candidates, {"latest_year": 2025, "score": 580, "rank": 12000})
 
-        self.assertEqual([len(column["cards"]) for column in columns], [3, 5, 3])
-        self.assertEqual(strategy["rush_ratio"], 27)
-        self.assertEqual(strategy["steady_ratio"], 45)
-        self.assertEqual(strategy["safe_ratio"], 27)
+        self.assertEqual([len(column["cards"]) for column in columns], [1, 8, 2])
+        self.assertEqual(strategy["rush_ratio"], 29)
+        self.assertEqual(strategy["steady_ratio"], 50)
+        self.assertEqual(strategy["safe_ratio"], 21)
+        self.assertEqual(strategy["total_choice_target"], 48)
+        self.assertIn("48 个院校专业组", strategy["note"])
+
+    def test_build_plan_columns_uses_conservative_six_tier_columns_when_requested(self):
+        candidates = (
+            _many_candidates("rush", 1, 20)
+            + _many_candidates("steady", 101, 30)
+            + _many_candidates("safe", 201, 30)
+        )
+
+        columns, strategy = build_plan_columns_from_candidates(
+            candidates,
+            {
+                "latest_year": 2025,
+                "score": 580,
+                "rank": 12000,
+                "admissions_strategy_mode": "conservative",
+            },
+        )
+
+        self.assertEqual([column["key"] for column in columns], ["risk", "sprint", "steady", "protect", "cushion", "fallback"])
+        self.assertEqual([len(column["cards"]) for column in columns], [5, 5, 16, 12, 5, 5])
+        self.assertEqual(strategy["mode"], "conservative")
+        self.assertEqual(strategy["display_tier_counts"], {"risk": 5, "sprint": 5, "steady": 16, "protect": 12, "cushion": 5, "fallback": 5})
+        self.assertIn("险5 / 冲5 / 稳16 / 保12 / 垫5 / 兜5", strategy["note"])
 
 
 if __name__ == "__main__":

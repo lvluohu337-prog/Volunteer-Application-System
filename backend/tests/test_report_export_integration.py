@@ -59,6 +59,8 @@ class ReportExportIntegrationTest(unittest.TestCase):
                     self.assertEqual(artifact_path.name, result["artifactName"])
                     self.assertEqual(delivery_kwargs["payload_summary"]["artifactType"], "final_document")
                     self.assertIn("renderEngine", delivery_kwargs["payload_summary"])
+                    expected_engine = "reportlab_pdf_renderer" if export_format == "pdf" else "builtin_docx_renderer"
+                    self.assertEqual(delivery_kwargs["payload_summary"]["renderEngine"], expected_engine)
 
 
 if __name__ == "__main__":
