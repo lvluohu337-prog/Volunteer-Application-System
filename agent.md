@@ -1030,6 +1030,7 @@
   - Promotion guidance explicitly limits formal scope to 河南, keeps 八字/画像 as direction and communication support rather than录取依据, and positions 399 标准版 as the current main structured report product.
 - Next:
   - Before public demos, prepare a脱敏样例学生 and a downloadable sample 399 PDF / Word report so the promotion teacher can show a realistic artifact without exposing real student data.
+
 ### Task 44: Evaluate rush-steady-safe rank allocation algorithm for Henan 2026
 
 - Time: 2026-06-24
@@ -1043,3 +1044,38 @@
   - The rank-first, rush/steady/safe layering idea is suitable for the system.
   - It should not be copied directly because Henan 2026 ordinary undergraduate batch uses 48 college-major-group choices with 6 majors and adjustment option, not the online example of 96 choices.
   - Recommended implementation direction is to turn the percentages and rank bands into configurable strategy rules, then align output with 48 group choices and 6 in-group majors.
+
+### Task 45: Push current version to cloud
+
+- Time: 2026-06-24
+- Request: User asked to push the current version to the cloud.
+- Actions:
+  1. Re-read `agent.md`, `C:\Users\lenovo\.codex\RTK.md`, and the GitHub publish workflow before operating on Git.
+  2. Checked branch and remote: current branch `main`, remote `origin` = `https://github.com/lvluohu337-prog/Volunteer-Application-System.git`.
+  3. Inspected mixed working tree and intentionally staged only source/documentation files:
+     - `README.md`
+     - `TESTING.md`
+     - `agent.md`
+     - `backend/report_exporters.py`
+     - `backend/tests/test_report_exporter_unit.py`
+     - `docs/README.md`
+     - `docs/推广老师沟通说明_2026-06-24.md`
+  4. Left local generated/untracked artifacts unstaged:
+     - `.claude/`
+     - `output/`
+     - `output_reports_page.png`
+     - `output_reports_page_after_restart.png`
+     - `tmp_backend_8000.err`
+     - `tmp_backend_8000.out`
+  5. Ran focused verification before commit.
+  6. Committed and pushed the staged version to `origin/main`.
+- Verification:
+  - `python -m unittest backend.tests.test_report_exporter_unit backend.tests.test_report_export_integration -v`: PASS, 6 tests OK
+  - `npm run test:product-flow`: PASS
+  - `git diff --check -- README.md TESTING.md agent.md backend/report_exporters.py backend/tests/test_report_exporter_unit.py docs/README.md docs/推广老师沟通说明_2026-06-24.md`: PASS
+  - `git rev-list --left-right --count main...origin/main`: `0 0` after push
+- Cloud commit pushed:
+  - `4e40b75` `Document promotion guide and PDF export fixes`
+- Result:
+  - Current source/documentation version has been pushed to GitHub `origin/main`.
+  - Only local generated artifacts remain untracked; they were not included in the cloud push.
